@@ -1,20 +1,27 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  项目: Cheki Counter —— 离线 Android App,记录地下偶像切奇(拍立得)并做统计。
+  技术栈: Flutter + Dart, SQLite (sqflite), provider 状态管理, fl_chart 可视化,
+          file_picker / share_plus 处理 CSV 导入导出, 仅打包 Android APK。
+  架构: lib/ 下分 data / features / shared 三层;data 层使用 Repository 模式封装
+        SQLite 访问,业务规则在事务里完成(例如删除最后一条记录时同步删除偶像)。
+  数据模型: 双表 idols + records;偶像业务主键 = (名字, 应援色, 团体) 三元组,
+            改任一字段 = 新建偶像。偶像派生于记录,无记录的偶像不存在。
+  CSV: 列格式固定为 `ID,应援色,团体,日期,数量,单价,小计,场地,创建时间`,
+       UTF-8 BOM,RFC 4180 转义,与仓库根 csv/counts.csv 对齐;导入语义为合并追加,
+       去重键为 (idol_id, date, count, unit_price, venue, created_at)。
+  应援色: 20 种中文色名预设,CSV 中存中文,App 内查表渲染 hex。
+  约定: 仅简体中文 UI,无深色模式,无云同步,无登录;只删单条记录,不支持
+        原地编辑偶像字段。
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - 必须在 Why / What Changes / Capabilities / Impact 四节内说明动机、范围与影响
+    - 列出涉及的 capability 时区分 New / Modified
+  design:
+    - 关键决策用 D1, D2... 编号,每条决策附"为什么"和候选对比(若有)
+    - Risks / Trade-offs 一节必填,标注 Mitigation
+  tasks:
+    - 按实现顺序分大节(脚手架 → 数据层 → UI → 打包),每节不超过约 2 小时粒度
+    - 每个 checkbox 必须落到具体文件或函数
