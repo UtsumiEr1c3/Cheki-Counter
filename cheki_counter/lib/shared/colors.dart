@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 /// 20 preset fan colors: Chinese name -> hex.
@@ -34,3 +36,12 @@ Color colorFor(String name) {
 
 /// All preset color names in display order.
 List<String> get presetColorNames => presetColors.keys.toList();
+
+/// Return a chart-safe version of [color]: when the color is too light to
+/// render on a pale card background (relative luminance > 0.7), darken it by
+/// clamping its HSL lightness to at most 0.45. Other colors pass through.
+Color chartColorFor(Color color) {
+  if (color.computeLuminance() <= 0.7) return color;
+  final hsl = HSLColor.fromColor(color);
+  return hsl.withLightness(min(hsl.lightness, 0.45)).toColor();
+}

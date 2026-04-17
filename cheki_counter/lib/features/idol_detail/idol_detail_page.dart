@@ -180,29 +180,11 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
       spots.add(FlSpot(i.toDouble(), dayMap[sortedDays[i]]!.toDouble()));
     }
 
-    // For sparse daily mode: use individual line segments (no connecting across gaps)
-    // We detect gaps and split into separate line bar data
-    final lineBars = <LineChartBarData>[];
-    List<FlSpot> currentSegment = [spots.first];
-
-    for (int i = 1; i < spots.length; i++) {
-      final prevDate = DateTime.parse(sortedDays[i - 1]);
-      final currDate = DateTime.parse(sortedDays[i]);
-      final gap = currDate.difference(prevDate).inDays;
-
-      if (gap > 1) {
-        // Break segment
-        lineBars.add(_makeLineBar(currentSegment, lineColor));
-        currentSegment = [spots[i]];
-      } else {
-        currentSegment.add(spots[i]);
-      }
-    }
-    lineBars.add(_makeLineBar(currentSegment, lineColor));
+    final chartColor = chartColorFor(lineColor);
 
     return LineChart(
       LineChartData(
-        lineBarsData: lineBars,
+        lineBarsData: [_makeLineBar(spots, chartColor)],
         titlesData: FlTitlesData(
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -265,7 +247,7 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
 
     return LineChart(
       LineChartData(
-        lineBarsData: [_makeLineBar(spots, lineColor)],
+        lineBarsData: [_makeLineBar(spots, chartColorFor(lineColor))],
         titlesData: FlTitlesData(
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
