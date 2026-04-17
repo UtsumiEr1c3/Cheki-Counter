@@ -1,0 +1,56 @@
+# settings Specification
+
+## Purpose
+TBD - created by archiving change add-cheki-counter. Update Purpose after archive.
+## Requirements
+### Requirement: 设置页入口
+
+主界面 SHALL 在右上角提供设置按钮,点击后导航到设置页。设置页 SHALL 至少包含三个入口:导入 CSV、导出 CSV、团体总览。
+
+#### Scenario: 从主界面打开设置
+
+- **WHEN** 用户点击主界面右上角设置按钮
+- **THEN** 系统导航到设置页,页面显示上述三个入口
+
+#### Scenario: 设置页不含偶像编辑入口
+
+- **WHEN** 用户浏览设置页
+- **THEN** 设置页 MUST NOT 提供任何修改偶像名字、应援色、团体的入口(这些由"新建偶像"流程完成)
+
+### Requirement: 导入 CSV 入口行为
+
+"导入 CSV"入口 SHALL 调起系统文件选择器,用户选择 `.csv` 文件后系统按 `csv-io` 规格执行合并追加,并在导入结束后显示导入摘要对话框。
+
+#### Scenario: 文件选择后自动执行
+
+- **WHEN** 用户从文件选择器中选定一个 CSV 文件
+- **THEN** 系统立即开始解析与合并,无需二次确认
+
+#### Scenario: 用户取消文件选择
+
+- **WHEN** 用户在文件选择器中按返回
+- **THEN** 设置页保持原样,不发生任何数据变更
+
+### Requirement: 导出 CSV 入口行为
+
+"导出 CSV"入口 SHALL 生成符合 `csv-io` 规格的临时文件并调起系统分享面板,由用户选择保存或发送目标。
+
+#### Scenario: 导出成功
+
+- **WHEN** 用户点击"导出 CSV"且数据库非空
+- **THEN** 系统生成临时 CSV 并弹出系统分享面板
+
+#### Scenario: 数据为空时的导出
+
+- **WHEN** 用户点击"导出 CSV"但数据库中无任何偶像或记录
+- **THEN** 系统仍生成一个仅包含表头的 CSV 并调起分享面板
+
+### Requirement: 团体总览入口行为
+
+"团体总览"入口 SHALL 导航到团体总览页面,该页面按 `statistics` 规格中"团体总览页"要求渲染。
+
+#### Scenario: 从设置进入团体总览
+
+- **WHEN** 用户在设置页点击"团体总览"
+- **THEN** 系统导航到团体总览页,列出所有存在偶像的团体及其聚合数据
+

@@ -11,7 +11,7 @@
 - [x] 2.2 在 `lib/data/models/` 下写 `Idol` 与 `CheckiRecord` 的 dataclass(`fromMap / toMap`)
 - [x] 2.3 实现 `IdolRepository`:`getAllWithAggregates({sortBy, year})`、`findByTriple`、`insertWithFirstRecord(idol, record)`
 - [x] 2.4 实现 `RecordRepository`:`insert`、`deleteAndCleanupIdolIfEmpty(recordId)`(事务)、`listByIdol(idolId)`、`lastUnitPriceOf(idolId)`
-- [ ] 2.5 写单元测试覆盖 2.3 和 2.4:空 repo → 新建偶像带首记录 → 加第二条记录 → 删到只剩一条 → 删最后一条偶像消失
+- [x] 2.5 写单元测试覆盖 2.3 和 2.4:空 repo → 新建偶像带首记录 → 加第二条记录 → 删到只剩一条 → 删最后一条偶像消失
 
 ## 3. 应援色预设与共享工具
 
@@ -83,11 +83,11 @@
 
 ## 13. 种子数据验证与打磨
 
-- [ ] 13.1 用仓库根 `counts.csv`(67 行)走完一次导入,人工校验偶像数量、总切数、总金额与预期吻合
-- [ ] 13.2 回归:添加 → 删除 → 再添加 → 导出 → 导入,验证零增量导入
-- [ ] 13.3 边界检查:同名不同色 / 同名同色不同团 / 未知色名 / 场地含逗号的导入导出
+- [x] 13.1 用仓库根 `counts.csv`(67 行)走完一次导入,人工校验偶像数量、总切数、总金额与预期吻合
+- [x] 13.2 回归:添加 → 删除 → 再添加 → 导出 → 导入,验证零增量导入
+- [x] 13.3 边界检查:同名不同色 / 同名同色不同团 / 未知色名 / 场地含逗号的导入导出
 
 ## 14. 打包
 
-- [ ] 14.1 `flutter build apk --release --split-per-abi`,验证 arm64-v8a 包可在 Android 10+ 真机安装运行
-- [ ] 14.2 在 README(或设置页"关于")记录版本号与已知限制
+- [x] 14.1 `flutter build apk --release --split-per-abi`,验证 arm64-v8a 包可在 Android 10+ 真机安装运行
+- [x] 14.2 在 README(或设置页"关于")记录版本号与已知限制
