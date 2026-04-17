@@ -14,20 +14,33 @@ class IdolRepository {
     String? year,
   }) async {
     final db = await _db;
-    final yearFilter = year != null
-        ? "AND strftime('%Y', r.date) = '$year'"
-        : '';
     final orderCol = sortBy == 'amount' ? 'total_amount' : 'total_count';
 
-    final results = await db.rawQuery('''
-      SELECT i.id, i.name, i.color, i.group_name, i.created_at,
-             COALESCE(SUM(r.count), 0) AS total_count,
-             COALESCE(SUM(r.subtotal), 0) AS total_amount
-      FROM idols i
-      LEFT JOIN records r ON r.idol_id = i.id $yearFilter
-      GROUP BY i.id
-      ORDER BY $orderCol DESC
-    ''');
+    final String query;
+    if (year != null) {
+      query = '''
+        SELECT i.id, i.name, i.color, i.group_name, i.created_at,
+               SUM(r.count) AS total_count,
+               SUM(r.subtotal) AS total_amount
+        FROM idols i
+        INNER JOIN records r ON r.idol_id = i.id
+        WHERE strftime('%Y', r.date) = '$year'
+        GROUP BY i.id
+        ORDER BY $orderCol DESC
+      ''';
+    } else {
+      query = '''
+        SELECT i.id, i.name, i.color, i.group_name, i.created_at,
+               COALESCE(SUM(r.count), 0) AS total_count,
+               COALESCE(SUM(r.subtotal), 0) AS total_amount
+        FROM idols i
+        LEFT JOIN records r ON r.idol_id = i.id
+        GROUP BY i.id
+        ORDER BY $orderCol DESC
+      ''';
+    }
+
+    final results = await db.rawQuery(query);
 
     return results.map((row) => Idol.fromMap(row)).toList();
   }
