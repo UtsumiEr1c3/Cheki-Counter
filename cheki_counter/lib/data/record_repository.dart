@@ -106,6 +106,39 @@ class RecordRepository {
     return results.map((r) => r['year'] as String).toList();
   }
 
+  /// Get distinct venues from records, case-folded to drop near-duplicates.
+  /// For each lowercase group, returns the original venue string whose record
+  /// has the most recent `created_at`. Ordered by that same timestamp DESC.
+  Future<List<String>> getDistinctVenues() async {
+    final db = await _db;
+    final results = await db.rawQuery('''
+      SELECT venue, MAX(created_at) AS last_used
+      FROM records
+      WHERE venue IS NOT NULL AND venue != ''
+      GROUP BY LOWER(venue)
+      ORDER BY last_used DESC
+    ''');
+    return results.map((r) => r['venue'] as String).toList();
+  }
+
+  /// Resolve canonical venue form for a user-typed input.
+  /// Trims input; returns null for empty. Otherwise looks up the most recent
+  /// record whose venue matches case-insensitively and returns that venue's
+  /// original casing. Returns null if no match (caller should fall back to
+  /// the trimmed input).
+  Future<String?> canonicalVenueFor(String input) async {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return null;
+    final db = await _db;
+    final results = await db.rawQuery(
+      'SELECT venue FROM records WHERE LOWER(venue) = LOWER(?) '
+      'ORDER BY created_at DESC LIMIT 1',
+      [trimmed],
+    );
+    if (results.isEmpty) return null;
+    return results.first['venue'] as String;
+  }
+
   /// Check if a record with the exact dedup key already exists.
   Future<bool> existsByDedupKey({
     required int idolId,

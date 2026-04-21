@@ -3,6 +3,7 @@ import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/data/models/record.dart';
 import 'package:cheki_counter/shared/colors.dart';
 import 'package:cheki_counter/shared/formatters.dart';
+import 'package:cheki_counter/shared/widgets/venue_field.dart';
 
 class AddRecordDialog extends StatefulWidget {
   final int idolId;
@@ -69,13 +70,17 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
     final unitPrice = int.parse(_priceController.text);
     final now = DateTime.now();
 
+    final trimmedVenue = _venueController.text.trim();
+    final canonicalVenue =
+        (await _repo.canonicalVenueFor(trimmedVenue)) ?? trimmedVenue;
+
     final record = CheckiRecord(
       idolId: widget.idolId,
       date: formatDate(_selectedDate),
       count: count,
       unitPrice: unitPrice,
       subtotal: count * unitPrice,
-      venue: _venueController.text.trim(),
+      venue: canonicalVenue,
       createdAt: now.toIso8601String(),
     );
 
@@ -169,12 +174,8 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
               ),
               const SizedBox(height: 12),
               // Venue
-              TextFormField(
+              VenueField(
                 controller: _venueController,
-                decoration: const InputDecoration(
-                  labelText: '场地',
-                  border: OutlineInputBorder(),
-                ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return '请填写场地';
                   return null;

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cheki_counter/data/idol_repository.dart';
 import 'package:cheki_counter/data/models/idol.dart';
 import 'package:cheki_counter/data/models/record.dart';
+import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/shared/colors.dart';
 import 'package:cheki_counter/shared/formatters.dart';
+import 'package:cheki_counter/shared/widgets/venue_field.dart';
 
 class AddIdolDialog extends StatefulWidget {
   const AddIdolDialog({super.key});
@@ -22,6 +24,7 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
   late DateTime _selectedDate;
   String _selectedColor = presetColorNames.first;
   final _repo = IdolRepository();
+  final _recordRepo = RecordRepository();
   String? _tripleError;
 
   @override
@@ -71,6 +74,10 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
     final unitPrice = int.parse(_priceController.text);
     final now = DateTime.now();
 
+    final trimmedVenue = _venueController.text.trim();
+    final canonicalVenue =
+        (await _recordRepo.canonicalVenueFor(trimmedVenue)) ?? trimmedVenue;
+
     final idol = Idol(
       name: name,
       color: color,
@@ -84,7 +91,7 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
       count: count,
       unitPrice: unitPrice,
       subtotal: count * unitPrice,
-      venue: _venueController.text.trim(),
+      venue: canonicalVenue,
       createdAt: now.toIso8601String(),
     );
 
@@ -193,12 +200,8 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
               ),
               const SizedBox(height: 12),
               // Venue
-              TextFormField(
+              VenueField(
                 controller: _venueController,
-                decoration: const InputDecoration(
-                  labelText: '场地',
-                  border: OutlineInputBorder(),
-                ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return '请填写场地';
                   return null;
