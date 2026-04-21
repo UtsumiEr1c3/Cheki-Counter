@@ -4,6 +4,8 @@ import 'package:cheki_counter/features/home/idol_list_notifier.dart';
 import 'package:cheki_counter/features/home/idol_card.dart';
 import 'package:cheki_counter/features/home/add_idol_dialog.dart';
 import 'package:cheki_counter/features/home/add_record_dialog.dart';
+import 'package:cheki_counter/features/events/add_event_dialog.dart';
+import 'package:cheki_counter/features/events/events_overview_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -27,6 +29,19 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text('Cheki Counter'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.event),
+            tooltip: '偶活总览',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const EventsOverviewPage(),
+                ),
+              );
+              if (context.mounted) context.read<IdolListNotifier>().refresh();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.bar_chart),
             tooltip: '统计',
@@ -134,16 +149,49 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await showDialog(
-            context: context,
-            builder: (_) => const AddIdolDialog(),
-          );
-          if (context.mounted) context.read<IdolListNotifier>().refresh();
-        },
+        onPressed: () => _showAddMenu(context),
         child: const Icon(Icons.add),
       ),
     );
+  }
+
+  Future<void> _showAddMenu(BuildContext context) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.person_add),
+              title: const Text('新建偶像'),
+              onTap: () => Navigator.pop(ctx, 'idol'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.event_available),
+              title: const Text('新建活动(无偶像)'),
+              onTap: () => Navigator.pop(ctx, 'event'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!context.mounted || choice == null) return;
+
+    if (choice == 'idol') {
+      await showDialog(
+        context: context,
+        builder: (_) => const AddIdolDialog(),
+      );
+    } else if (choice == 'event') {
+      await showDialog(
+        context: context,
+        builder: (_) => const AddEventDialog(),
+      );
+    }
+
+    if (context.mounted) context.read<IdolListNotifier>().refresh();
   }
 }
 

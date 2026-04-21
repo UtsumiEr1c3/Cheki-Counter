@@ -73,6 +73,7 @@ class SettingsPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('新增偶像: ${importResult.newIdols} 个'),
+            Text('新增活动: ${importResult.newEvents} 个'),
             Text('新增记录: ${importResult.newRecords} 条'),
             Text('跳过重复: ${importResult.skipped} 条'),
             Text('错误: ${importResult.errors} 条'),

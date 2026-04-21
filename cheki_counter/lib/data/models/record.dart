@@ -7,6 +7,7 @@ class CheckiRecord {
   final int subtotal;
   final String venue;
   final String createdAt;
+  final int? eventId;
 
   CheckiRecord({
     this.id,
@@ -17,6 +18,7 @@ class CheckiRecord {
     required this.subtotal,
     required this.venue,
     required this.createdAt,
+    this.eventId,
   });
 
   Map<String, dynamic> toMap() {
@@ -29,6 +31,7 @@ class CheckiRecord {
       'subtotal': subtotal,
       'venue': venue,
       'created_at': createdAt,
+      'event_id': eventId,
     };
   }
 
@@ -42,6 +45,7 @@ class CheckiRecord {
       subtotal: map['subtotal'] as int,
       venue: map['venue'] as String,
       createdAt: map['created_at'] as String,
+      eventId: map['event_id'] as int?,
     );
   }
 }

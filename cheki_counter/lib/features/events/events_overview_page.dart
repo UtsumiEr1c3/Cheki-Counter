@@ -1,0 +1,116 @@
+import 'package:flutter/material.dart';
+import 'package:cheki_counter/data/event_repository.dart';
+import 'package:cheki_counter/features/events/event_card.dart';
+import 'package:cheki_counter/features/events/event_detail_page.dart';
+
+class EventsOverviewPage extends StatefulWidget {
+  const EventsOverviewPage({super.key});
+
+  @override
+  State<EventsOverviewPage> createState() => _EventsOverviewPageState();
+}
+
+class _EventsOverviewPageState extends State<EventsOverviewPage> {
+  final _repo = EventRepository();
+  List<EventWithSummary> _events = [];
+  List<String> _years = [];
+  String? _selectedYear;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final years = await _repo.getDistinctYears();
+    if (_selectedYear != null && !years.contains(_selectedYear)) {
+      _selectedYear = null;
+    }
+    final events = await _repo.getAllWithRecordsSummary(year: _selectedYear);
+    if (!mounted) return;
+    setState(() {
+      _years = years;
+      _events = events;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalEvents = _events.length;
+    final withRecords = _events.where((e) => e.hasRecords).length;
+    final totalAmount = _events.fold(0, (sum, e) => sum + e.totalAmount);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('偶活总览'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String?>(
+                value: _selectedYear,
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('全部')),
+                  ..._years.map(
+                    (y) => DropdownMenuItem(value: y, child: Text('$y年')),
+                  ),
+                ],
+                onChanged: (v) {
+                  setState(() => _selectedYear = v);
+                  _load();
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _events.isEmpty
+              ? const Center(child: Text('暂无活动'))
+              : Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: _events.length,
+                        itemBuilder: (context, i) {
+                          final s = _events[i];
+                          return EventCard(
+                            summary: s,
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => EventDetailPage(
+                                    eventId: s.event.id!,
+                                  ),
+                                ),
+                              );
+                              if (mounted) _load();
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      child: Text(
+                        '$totalEvents 场 · $withRecords 场有切奇 · ¥$totalAmount',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+    );
+  }
+}

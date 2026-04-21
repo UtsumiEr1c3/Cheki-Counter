@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cheki_counter/data/db.dart';
+import 'package:cheki_counter/data/event_repository.dart';
 import 'package:cheki_counter/data/record_repository.dart';
+import 'package:cheki_counter/data/models/event.dart';
 import 'package:cheki_counter/data/models/record.dart';
 import 'package:cheki_counter/shared/colors.dart';
 import 'package:cheki_counter/shared/formatters.dart';
 import 'package:cheki_counter/shared/widgets/venue_field.dart';
+import 'package:cheki_counter/shared/widgets/event_field.dart';
 
 class AddRecordDialog extends StatefulWidget {
   final int idolId;
@@ -28,8 +32,10 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
   final _countController = TextEditingController();
   final _priceController = TextEditingController();
   final _venueController = TextEditingController();
+  final _eventController = TextEditingController();
   late DateTime _selectedDate;
   final _repo = RecordRepository();
+  final _eventRepo = EventRepository();
 
   @override
   void initState() {
@@ -48,6 +54,7 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
     _countController.dispose();
     _priceController.dispose();
     _venueController.dispose();
+    _eventController.dispose();
     super.dispose();
   }
 
@@ -63,28 +70,57 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
     }
   }
 
+  void _onEventSelected(CheckiEvent? e) {
+    if (e == null) return;
+    setState(() {
+      _venueController.text = e.venue;
+      try {
+        _selectedDate = DateTime.parse(e.date);
+      } catch (_) {}
+    });
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     final count = int.parse(_countController.text);
     final unitPrice = int.parse(_priceController.text);
     final now = DateTime.now();
+    final nowIso = now.toIso8601String();
 
     final trimmedVenue = _venueController.text.trim();
     final canonicalVenue =
         (await _repo.canonicalVenueFor(trimmedVenue)) ?? trimmedVenue;
+    final eventName = _eventController.text.trim();
+    final dateStr = formatDate(_selectedDate);
 
-    final record = CheckiRecord(
-      idolId: widget.idolId,
-      date: formatDate(_selectedDate),
-      count: count,
-      unitPrice: unitPrice,
-      subtotal: count * unitPrice,
-      venue: canonicalVenue,
-      createdAt: now.toIso8601String(),
-    );
+    final db = await DatabaseHelper.instance.database;
+    await db.transaction((txn) async {
+      int? eventId;
+      if (eventName.isNotEmpty) {
+        eventId = await _eventRepo.upsertByTriple(
+          eventName,
+          canonicalVenue,
+          dateStr,
+          nowIso,
+          executor: txn,
+        );
+      }
 
-    await _repo.insert(record);
+      final record = CheckiRecord(
+        idolId: widget.idolId,
+        date: dateStr,
+        count: count,
+        unitPrice: unitPrice,
+        subtotal: count * unitPrice,
+        venue: canonicalVenue,
+        createdAt: nowIso,
+        eventId: eventId,
+      );
+
+      await _repo.insert(record, executor: txn);
+    });
+
     if (mounted) Navigator.of(context).pop(true);
   }
 
@@ -180,6 +216,12 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
                   if (v == null || v.trim().isEmpty) return '请填写场地';
                   return null;
                 },
+              ),
+              const SizedBox(height: 12),
+              // Event (optional)
+              EventField(
+                controller: _eventController,
+                onEventSelected: _onEventSelected,
               ),
             ],
           ),

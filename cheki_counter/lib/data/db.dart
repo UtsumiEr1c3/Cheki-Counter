@@ -19,8 +19,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -37,6 +38,20 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
+      CREATE TABLE events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        venue TEXT NOT NULL,
+        date TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute(
+      'CREATE UNIQUE INDEX idx_events_triple ON events(name, venue, date)',
+    );
+
+    await db.execute('''
       CREATE TABLE records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         idol_id INTEGER NOT NULL,
@@ -46,8 +61,28 @@ class DatabaseHelper {
         subtotal INTEGER NOT NULL,
         venue TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        FOREIGN KEY (idol_id) REFERENCES idols (id)
+        event_id INTEGER,
+        FOREIGN KEY (idol_id) REFERENCES idols (id),
+        FOREIGN KEY (event_id) REFERENCES events (id)
       )
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          venue TEXT NOT NULL,
+          date TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      ''');
+      await db.execute(
+        'CREATE UNIQUE INDEX idx_events_triple ON events(name, venue, date)',
+      );
+      await db.execute('ALTER TABLE records ADD COLUMN event_id INTEGER');
+    }
   }
 }
