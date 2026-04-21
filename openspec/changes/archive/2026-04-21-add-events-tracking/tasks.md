@@ -51,17 +51,17 @@
 
 ## 8. 归档 CSV
 
-- [ ] 8.1 同步更新仓库根目录的 `csv/counts.csv` 或新建 `csv/cheki_export_sample.csv` 展示 11 列新格式(可选文档性工作,若不做则在 proposal 的 Impact 注明)
+- [x] 8.1 同步更新仓库根目录的 `csv/counts.csv` 或新建 `csv/cheki_export_sample.csv` 展示 11 列新格式(可选文档性工作,若不做则在 proposal 的 Impact 注明)
 
 ## 9. 手动冒烟测试
 
-- [ ] 9.1 新鲜安装 APK,跑一遍"新建偶像 → 加切奇(不选活动)→ 新建活动 → 加切奇(选已有活动)→ 偶活总览浏览 → 详情页查看"的 golden path
-- [ ] 9.2 升级路径测试:在安装 v1 版本录入数据后,覆盖安装新 APK;验证老数据 `event_id` 均为 NULL,列表与统计正常
-- [ ] 9.3 CSV 往返测试:导出 11 列 CSV → 清空 DB → 导入 → 验证零增量(新增 0 条,跳过全部)
-- [ ] 9.4 CSV 向后兼容:使用仓库中已有的 9 列 `csv/cheki_export.csv` 导入新版本 App,验证全部按 B 行路径导入,errors = 0
-- [ ] 9.5 昼夜公演场景:新建同日同场地不同名两个 event,各加一条相同偶像/数量/单价/场地的切奇;验证两条 records 都存在未被去重
+- [x] 9.1 新鲜安装 APK,跑一遍"新建偶像 → 加切奇(不选活动)→ 新建活动 → 加切奇(选已有活动)→ 偶活总览浏览 → 详情页查看"的 golden path
+- [x] 9.2 升级路径测试:在安装 v1 版本录入数据后,覆盖安装新 APK;验证老数据 `event_id` 均为 NULL,列表与统计正常
+- [x] 9.3 CSV 往返测试:导出 11 列 CSV → 清空 DB → 导入 → 验证零增量(新增 0 条,跳过全部)
+- [x] 9.4 CSV 向后兼容:使用仓库中已有的 9 列 `csv/cheki_export.csv` 导入新版本 App,验证全部按 B 行路径导入,errors = 0
+- [x] 9.5 昼夜公演场景:新建同日同场地不同名两个 event,各加一条相同偶像/数量/单价/场地的切奇;验证两条 records 都存在未被去重
 
 ## 10. 打包与交付
 
 - [x] 10.1 运行 `flutter pub get` 确认无依赖变动(本 change 不引入新包)
-- [ ] 10.2 使用 `build-flutter-apk` skill 产出 release APK,确认体积与启动正常
+- [x] 10.2 使用 `build-flutter-apk` skill 产出 release APK,确认体积与启动正常
