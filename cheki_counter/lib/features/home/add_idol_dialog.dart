@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cheki_counter/data/event_repository.dart';
 import 'package:cheki_counter/data/idol_repository.dart';
+import 'package:cheki_counter/data/models/event.dart';
 import 'package:cheki_counter/data/models/idol.dart';
 import 'package:cheki_counter/data/models/record.dart';
 import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/shared/colors.dart';
 import 'package:cheki_counter/shared/formatters.dart';
+import 'package:cheki_counter/shared/widgets/event_field.dart';
 import 'package:cheki_counter/shared/widgets/venue_field.dart';
 
 class AddIdolDialog extends StatefulWidget {
@@ -21,10 +24,13 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
   final _countController = TextEditingController();
   final _priceController = TextEditingController(text: '60');
   final _venueController = TextEditingController();
+  final _eventController = TextEditingController();
   late DateTime _selectedDate;
   String _selectedColor = presetColorNames.first;
+  bool _isOnline = false;
   final _repo = IdolRepository();
   final _recordRepo = RecordRepository();
+  final _eventRepo = EventRepository();
   String? _tripleError;
 
   @override
@@ -40,7 +46,37 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
     _countController.dispose();
     _priceController.dispose();
     _venueController.dispose();
+    _eventController.dispose();
     super.dispose();
+  }
+
+  void _onEventSelected(CheckiEvent? e) {
+    if (e == null) return;
+    setState(() {
+      if (!_isOnline) {
+        _venueController.text = e.venue;
+      }
+      try {
+        _selectedDate = DateTime.parse(e.date);
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _onToggleOnline(bool on) async {
+    if (on) {
+      final canonical =
+          (await _recordRepo.canonicalVenueFor('电切')) ?? '电切';
+      if (!mounted) return;
+      setState(() {
+        _isOnline = true;
+        _venueController.text = canonical;
+      });
+    } else {
+      setState(() {
+        _isOnline = false;
+        _venueController.text = '';
+      });
+    }
   }
 
   Future<void> _pickDate() async {
@@ -73,26 +109,41 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
     final count = int.parse(_countController.text);
     final unitPrice = int.parse(_priceController.text);
     final now = DateTime.now();
+    final nowIso = now.toIso8601String();
+    final dateStr = formatDate(_selectedDate);
 
     final trimmedVenue = _venueController.text.trim();
     final canonicalVenue =
         (await _recordRepo.canonicalVenueFor(trimmedVenue)) ?? trimmedVenue;
 
+    final eventName = _eventController.text.trim();
+    int? eventId;
+    if (eventName.isNotEmpty) {
+      eventId = await _eventRepo.upsertByTriple(
+        eventName,
+        canonicalVenue,
+        dateStr,
+        nowIso,
+      );
+    }
+
     final idol = Idol(
       name: name,
       color: color,
       groupName: group,
-      createdAt: now.toIso8601String(),
+      createdAt: nowIso,
     );
 
     final record = CheckiRecord(
       idolId: 0, // will be set in transaction
-      date: formatDate(_selectedDate),
+      date: dateStr,
       count: count,
       unitPrice: unitPrice,
       subtotal: count * unitPrice,
       venue: canonicalVenue,
-      createdAt: now.toIso8601String(),
+      createdAt: nowIso,
+      eventId: eventId,
+      isOnline: _isOnline,
     );
 
     await _repo.insertWithFirstRecord(idol, record);
@@ -154,7 +205,16 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
               const Divider(),
               const Text('首条切奇记录',
                   style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
+              // 电切 switch
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('电切'),
+                value: _isOnline,
+                onChanged: (v) => _onToggleOnline(v),
+              ),
+              const SizedBox(height: 4),
               // Date picker
               InkWell(
                 onTap: _pickDate,
@@ -199,13 +259,30 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
                 },
               ),
               const SizedBox(height: 12),
-              // Venue
-              VenueField(
-                controller: _venueController,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return '请填写场地';
-                  return null;
-                },
+              // Venue — locked as "电切" when 电切 switch is ON
+              if (_isOnline)
+                TextFormField(
+                  controller: _venueController,
+                  enabled: false,
+                  decoration: const InputDecoration(
+                    labelText: '场地',
+                    border: OutlineInputBorder(),
+                    suffixIcon: Icon(Icons.lock_outline, size: 18),
+                  ),
+                )
+              else
+                VenueField(
+                  controller: _venueController,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return '请填写场地';
+                    return null;
+                  },
+                ),
+              const SizedBox(height: 12),
+              // Event (optional)
+              EventField(
+                controller: _eventController,
+                onEventSelected: _onEventSelected,
               ),
             ],
           ),

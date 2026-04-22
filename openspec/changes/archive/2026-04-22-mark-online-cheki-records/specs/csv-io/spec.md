@@ -1,9 +1,4 @@
-# csv-io Specification
-
-## Purpose
-定义应用与外部 CSV 文件之间的导入导出契约,包括 12 列格式、三类行语义(切奇+活动 / legacy 切奇 / 纯打卡活动)、合并追加算法、去重键、错误兜底和对老 9 列格式的向后兼容。
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: CSV 列格式
 

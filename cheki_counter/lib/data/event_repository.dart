@@ -90,9 +90,15 @@ class EventRepository {
   Future<List<EventWithSummary>> getAllWithRecordsSummary({String? year}) async {
     final db = await _db;
 
-    final whereClause =
-        year != null ? "WHERE strftime('%Y', e.date) = ?" : '';
-    final args = year != null ? [year] : <Object?>[];
+    final conditions = <String>[
+      "NOT EXISTS (SELECT 1 FROM records WHERE event_id = e.id AND is_online = 1)",
+    ];
+    final args = <Object?>[];
+    if (year != null) {
+      conditions.add("strftime('%Y', e.date) = ?");
+      args.add(year);
+    }
+    final whereClause = 'WHERE ${conditions.join(' AND ')}';
 
     final eventRows = await db.rawQuery('''
       SELECT e.id, e.name, e.venue, e.date, e.created_at,
@@ -100,7 +106,7 @@ class EventRepository {
              COALESCE(SUM(r.subtotal), 0) AS total_amount,
              COUNT(r.id) AS record_count
       FROM events e
-      LEFT JOIN records r ON r.event_id = e.id
+      LEFT JOIN records r ON r.event_id = e.id AND r.is_online = 0
       $whereClause
       GROUP BY e.id
       ORDER BY e.date DESC, e.id DESC
@@ -114,7 +120,7 @@ class EventRepository {
       SELECT r.event_id, i.name, i.color, SUM(r.count) AS cnt
       FROM records r
       JOIN idols i ON i.id = r.idol_id
-      WHERE r.event_id IN ($placeholders)
+      WHERE r.event_id IN ($placeholders) AND r.is_online = 0
       GROUP BY r.event_id, i.id
       ORDER BY cnt DESC, i.name ASC
     ''', ids);

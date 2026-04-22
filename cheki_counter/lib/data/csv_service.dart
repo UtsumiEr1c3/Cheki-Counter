@@ -36,6 +36,7 @@ class CsvService {
     '活动名',
     '活动场地',
     '活动日期',
+    '电切',
   ];
 
   /// Import CSV from file bytes. Merge-append semantics.
@@ -92,6 +93,21 @@ class CsvService {
         final eventName = col(9);
         final eventVenue = col(10);
         final eventDate = col(11);
+
+        // is_online (col 12, new in 13-column format)
+        bool isOnline = false;
+        if (row.length > 12) {
+          final raw = col(12);
+          if (raw == '1') {
+            isOnline = true;
+          } else if (raw.isEmpty || raw == '0') {
+            isOnline = false;
+          } else {
+            isOnline = false;
+            result.errors++;
+            result.errorDetails.add('行$lineNum: 电切列值无效,已按现场(0)处理');
+          }
+        }
 
         // Resolve event first (shared across both sides)
         int? eventId;
@@ -166,6 +182,7 @@ class CsvService {
             venue: venue,
             createdAt: createdAt,
             eventId: eventId,
+            isOnline: isOnline,
           );
           await _idolRepo.insertWithFirstRecord(idolObj, record);
           result.newIdols++;
@@ -183,6 +200,7 @@ class CsvService {
             venue: venue,
             createdAt: createdAt,
             eventId: eventId,
+            isOnline: isOnline,
           );
 
           if (exists) {
@@ -197,6 +215,7 @@ class CsvService {
               venue: venue,
               createdAt: createdAt,
               eventId: eventId,
+              isOnline: isOnline,
             );
             await _recordRepo.insert(record);
             result.newRecords++;
@@ -233,6 +252,7 @@ class CsvService {
       SELECT i.name AS idol_name, i.color AS idol_color, i.group_name,
              r.date AS r_date, r.count, r.unit_price, r.subtotal,
              r.venue AS r_venue, r.created_at AS r_created,
+             r.is_online AS r_is_online,
              e.name AS e_name, e.venue AS e_venue, e.date AS e_date,
              COALESCE(e.date, r.date) AS sort_date, r.id AS r_id
       FROM records r
@@ -287,6 +307,7 @@ class CsvService {
             d['e_name'] ?? '',
             d['e_venue'] ?? '',
             d['e_date'] ?? '',
+            (d['r_is_online'] as int?) == 1 ? '1' : '0',
           ];
         } else {
           return [
@@ -295,6 +316,7 @@ class CsvService {
             d['e_name'] ?? '',
             d['e_venue'] ?? '',
             d['e_date'] ?? '',
+            '0',
           ];
         }
       }),

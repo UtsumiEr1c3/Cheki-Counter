@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:cheki_counter/data/record_repository.dart';
-import 'package:cheki_counter/data/models/record.dart';
 import 'package:cheki_counter/shared/colors.dart';
 
 class IdolDetailPage extends StatefulWidget {
@@ -22,11 +21,13 @@ class IdolDetailPage extends StatefulWidget {
 
 class _IdolDetailPageState extends State<IdolDetailPage> {
   final _repo = RecordRepository();
-  List<CheckiRecord> _records = [];
+  List<IdolRecordRow> _records = [];
   bool _byMonth = false; // false = by day, true = by month
 
-  int get _totalCount => _records.fold(0, (sum, r) => sum + r.count);
-  int get _totalAmount => _records.fold(0, (sum, r) => sum + r.subtotal);
+  int get _totalCount =>
+      _records.fold<int>(0, (sum, row) => sum + row.record.count);
+  int get _totalAmount =>
+      _records.fold<int>(0, (sum, row) => sum + row.record.subtotal);
 
   @override
   void initState() {
@@ -115,10 +116,22 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
             child: ListView.builder(
               itemCount: _records.length,
               itemBuilder: (context, index) {
-                final r = _records[index];
+                final row = _records[index];
+                final r = row.record;
+                final venueLine = '${r.venue}  单价¥${r.unitPrice}';
+                final hasEvent =
+                    row.eventName != null && row.eventName!.isNotEmpty;
                 return ListTile(
                   title: Text('${r.date}  ${r.count}切 ¥${r.subtotal}'),
-                  subtitle: Text('${r.venue}  单价¥${r.unitPrice}'),
+                  subtitle: hasEvent
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(row.eventName!),
+                            Text(venueLine),
+                          ],
+                        )
+                      : Text(venueLine),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     onPressed: () => _confirmDelete(r.id!),
@@ -169,7 +182,8 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
   Widget _buildDailyChart(Color lineColor) {
     // Aggregate by day from records (already loaded)
     final dayMap = <String, int>{};
-    for (final r in _records) {
+    for (final row in _records) {
+      final r = row.record;
       dayMap[r.date] = (dayMap[r.date] ?? 0) + r.count;
     }
     final sortedDays = dayMap.keys.toList()..sort();
@@ -220,7 +234,8 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
   Widget _buildMonthlyChart(Color lineColor) {
     // Aggregate by month from records
     final monthMap = <String, int>{};
-    for (final r in _records) {
+    for (final row in _records) {
+      final r = row.record;
       final ym = r.date.substring(0, 7); // YYYY-MM
       monthMap[ym] = (monthMap[ym] ?? 0) + r.count;
     }

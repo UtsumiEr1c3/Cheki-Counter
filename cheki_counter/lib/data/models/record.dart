@@ -8,6 +8,7 @@ class CheckiRecord {
   final String venue;
   final String createdAt;
   final int? eventId;
+  final bool isOnline;
 
   CheckiRecord({
     this.id,
@@ -19,6 +20,7 @@ class CheckiRecord {
     required this.venue,
     required this.createdAt,
     this.eventId,
+    this.isOnline = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -32,6 +34,7 @@ class CheckiRecord {
       'venue': venue,
       'created_at': createdAt,
       'event_id': eventId,
+      'is_online': isOnline ? 1 : 0,
     };
   }
 
@@ -46,6 +49,7 @@ class CheckiRecord {
       venue: map['venue'] as String,
       createdAt: map['created_at'] as String,
       eventId: map['event_id'] as int?,
+      isOnline: (map['is_online'] as int?) == 1,
     );
   }
 }

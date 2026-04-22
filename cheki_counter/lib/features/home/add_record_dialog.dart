@@ -34,6 +34,7 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
   final _venueController = TextEditingController();
   final _eventController = TextEditingController();
   late DateTime _selectedDate;
+  bool _isOnline = false;
   final _repo = RecordRepository();
   final _eventRepo = EventRepository();
 
@@ -73,11 +74,30 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
   void _onEventSelected(CheckiEvent? e) {
     if (e == null) return;
     setState(() {
-      _venueController.text = e.venue;
+      if (!_isOnline) {
+        _venueController.text = e.venue;
+      }
       try {
         _selectedDate = DateTime.parse(e.date);
       } catch (_) {}
     });
+  }
+
+  Future<void> _onToggleOnline(bool on) async {
+    if (on) {
+      final canonical =
+          (await _repo.canonicalVenueFor('电切')) ?? '电切';
+      if (!mounted) return;
+      setState(() {
+        _isOnline = true;
+        _venueController.text = canonical;
+      });
+    } else {
+      setState(() {
+        _isOnline = false;
+        _venueController.text = '';
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -116,6 +136,7 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
         venue: canonicalVenue,
         createdAt: nowIso,
         eventId: eventId,
+        isOnline: _isOnline,
       );
 
       await _repo.insert(record, executor: txn);
@@ -164,7 +185,16 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              // 电切 switch
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('电切'),
+                value: _isOnline,
+                onChanged: (v) => _onToggleOnline(v),
+              ),
+              const SizedBox(height: 4),
               // Date picker
               InkWell(
                 onTap: _pickDate,
@@ -209,14 +239,25 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
                 },
               ),
               const SizedBox(height: 12),
-              // Venue
-              VenueField(
-                controller: _venueController,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return '请填写场地';
-                  return null;
-                },
-              ),
+              // Venue — locked as "电切" when 电切 switch is ON
+              if (_isOnline)
+                TextFormField(
+                  controller: _venueController,
+                  enabled: false,
+                  decoration: const InputDecoration(
+                    labelText: '场地',
+                    border: OutlineInputBorder(),
+                    suffixIcon: Icon(Icons.lock_outline, size: 18),
+                  ),
+                )
+              else
+                VenueField(
+                  controller: _venueController,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return '请填写场地';
+                    return null;
+                  },
+                ),
               const SizedBox(height: 12),
               // Event (optional)
               EventField(

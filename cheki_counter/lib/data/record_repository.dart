@@ -2,6 +2,13 @@ import 'package:sqflite/sqflite.dart';
 import 'package:cheki_counter/data/db.dart';
 import 'package:cheki_counter/data/models/record.dart';
 
+class IdolRecordRow {
+  final CheckiRecord record;
+  final String? eventName;
+
+  IdolRecordRow({required this.record, this.eventName});
+}
+
 class RecordRepository {
   Future<Database> get _db => DatabaseHelper.instance.database;
 
@@ -50,15 +57,24 @@ class RecordRepository {
   }
 
   /// List all records for a given idol, ordered by date DESC, created_at DESC.
-  Future<List<CheckiRecord>> listByIdol(int idolId) async {
+  /// Joins `events` to carry the (optional) event name for UI display.
+  Future<List<IdolRecordRow>> listByIdol(int idolId) async {
     final db = await _db;
-    final results = await db.query(
-      'records',
-      where: 'idol_id = ?',
-      whereArgs: [idolId],
-      orderBy: 'date DESC, created_at DESC',
-    );
-    return results.map((row) => CheckiRecord.fromMap(row)).toList();
+    final rows = await db.rawQuery('''
+      SELECT r.id, r.idol_id, r.date, r.count, r.unit_price, r.subtotal,
+             r.venue, r.created_at, r.event_id, r.is_online,
+             e.name AS event_name
+      FROM records r
+      LEFT JOIN events e ON e.id = r.event_id
+      WHERE r.idol_id = ?
+      ORDER BY r.date DESC, r.created_at DESC
+    ''', [idolId]);
+    return rows
+        .map((row) => IdolRecordRow(
+              record: CheckiRecord.fromMap(row),
+              eventName: row['event_name'] as String?,
+            ))
+        .toList();
   }
 
   /// List all records for a given event, ordered by idol and created_at.
@@ -170,6 +186,7 @@ class RecordRepository {
     required String venue,
     required String createdAt,
     int? eventId,
+    required bool isOnline,
     DatabaseExecutor? executor,
   }) async {
     final db = executor ?? await _db;
@@ -178,8 +195,19 @@ class RecordRepository {
       WHERE idol_id = ? AND date = ? AND count = ?
         AND unit_price = ? AND venue = ? AND created_at = ?
         AND ((event_id IS NULL AND ? IS NULL) OR event_id = ?)
+        AND is_online = ?
       LIMIT 1
-    ''', [idolId, date, count, unitPrice, venue, createdAt, eventId, eventId]);
+    ''', [
+      idolId,
+      date,
+      count,
+      unitPrice,
+      venue,
+      createdAt,
+      eventId,
+      eventId,
+      isOnline ? 1 : 0,
+    ]);
     return result.isNotEmpty;
   }
 }

@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -62,6 +62,7 @@ class DatabaseHelper {
         venue TEXT NOT NULL,
         created_at TEXT NOT NULL,
         event_id INTEGER,
+        is_online INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (idol_id) REFERENCES idols (id),
         FOREIGN KEY (event_id) REFERENCES events (id)
       )
@@ -83,6 +84,15 @@ class DatabaseHelper {
         'CREATE UNIQUE INDEX idx_events_triple ON events(name, venue, date)',
       );
       await db.execute('ALTER TABLE records ADD COLUMN event_id INTEGER');
+    }
+    if (oldVersion < 3) {
+      await db.execute(
+        'ALTER TABLE records ADD COLUMN is_online INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.execute('''
+        UPDATE records SET is_online = 1
+        WHERE LOWER(venue) LIKE '%电切%' OR LOWER(venue) LIKE '%電切%'
+      ''');
     }
   }
 }

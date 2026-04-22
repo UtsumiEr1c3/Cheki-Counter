@@ -1,8 +1,5 @@
-# idols Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change add-cheki-counter. Update Purpose after archive.
-## Requirements
 ### Requirement: 偶像存在性由切奇记录派生
 
 系统 SHALL 只保留至少有一条切奇记录的偶像;不允许"有偶像但零记录"的状态。偶像的业务身份由三元组 `(名字, 应援色, 团体)` 唯一确定。新建偶像 popup (`AddIdolDialog`) 的"首条切奇记录"区域 SHALL 与 `AddRecordDialog` 字段齐平,包含日期、数量、单价、场地四个必填项,以及活动一个可选字段和电切一个布尔开关。首条记录提交时:若活动字段非空,SHALL 对 `events` 执行 `upsertByTriple(活动名, 场地, 日期)` 并把返回的 `event.id` 写入该首条记录的 `event_id`;电切开关状态 SHALL 写入首条记录的 `is_online`。电切开关 ON 时场地字段 SHALL 被锁定为 canonical `电切` 且禁用编辑,与 `AddRecordDialog` 行为一致。
@@ -41,60 +38,3 @@ TBD - created by archiving change add-cheki-counter. Update Purpose after archiv
 
 - **WHEN** 用户尝试通过任何 UI 路径创建偶像
 - **THEN** 系统 MUST 要求同时提供首条切奇记录的完整信息,否则拒绝提交
-
-### Requirement: 偶像业务主键为三元组
-
-系统 SHALL 使用 `(名字, 应援色, 团体)` 三元组作为偶像的业务主键。任一字段不同即视为不同偶像。
-
-#### Scenario: 同名不同团视为不同偶像
-
-- **WHEN** 已存在偶像 `(雪梨, 紫色, 心率研究所)`,用户新建 `(雪梨, 紫色, 其他团体)`
-- **THEN** 系统创建新的 `idols` 行,主界面出现两张"雪梨"卡片
-
-#### Scenario: 三元组相同视为同一偶像
-
-- **WHEN** 用户对已存在的 `(小五, 蓝色, EAUX)` 再次通过"新建偶像" popup 填写完全相同的三元组
-- **THEN** 系统 MUST 拒绝创建新偶像,并提示"该偶像已存在,请直接在卡片上加记录"
-
-### Requirement: 偶像字段不可原地编辑
-
-系统 SHALL NOT 提供对已有偶像的名字、应援色、团体的编辑入口。若需要"改名 / 改应援色 / 换团",用户 MUST 新建一个偶像。
-
-#### Scenario: 偶像卡片没有编辑按钮
-
-- **WHEN** 用户查看偶像卡片或个人详情页
-- **THEN** 界面不包含任何修改偶像名字、应援色、团体的控件
-
-### Requirement: 主界面偶像卡片展示
-
-主界面 SHALL 以卡片网格展示当前所有偶像,每张卡片显示偶像名、切数、总金额,卡片边框颜色为偶像的应援色对应 hex,卡片右上角提供快速添加切奇的 `+` 按钮。
-
-#### Scenario: 卡片边框取自应援色
-
-- **WHEN** 渲染偶像卡片
-- **THEN** 边框颜色 MUST 来自应援色预设色表的 hex 值;若色名不在预设表则使用灰色兜底
-
-#### Scenario: 卡片 `+` 按钮直接打开添加切奇 popup
-
-- **WHEN** 用户点击偶像卡片右上角的 `+`
-- **THEN** 系统弹出添加切奇 popup,其中偶像名、应援色、团体字段被锁定为该偶像的三元组
-
-#### Scenario: 点击卡片进入个人详情页
-
-- **WHEN** 用户点击卡片主体区域(非 `+` 按钮)
-- **THEN** 系统导航到该偶像的个人统计页
-
-### Requirement: 主界面汇总与排序
-
-主界面顶部 SHALL 显示总切数、总偶像数、总金额三项汇总;卡片列表 SHALL 支持"按切数降序"与"按金额降序"两种排序方式,用户可通过 UI 切换。
-
-#### Scenario: 汇总随数据变化实时刷新
-
-- **WHEN** 用户添加或删除一条切奇记录
-- **THEN** 顶部总切数、总金额 MUST 立即反映新值;若新建或删除的偶像影响总偶像数,总偶像数也同步更新
-
-#### Scenario: 切换排序方式
-
-- **WHEN** 用户在主界面选择"按金额"排序
-- **THEN** 卡片网格按各偶像的总金额降序重排,切换到"按切数"后按总切数降序重排
-
