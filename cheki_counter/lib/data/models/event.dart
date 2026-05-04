@@ -4,6 +4,7 @@ class CheckiEvent {
   final String venue;
   final String date;
   final String createdAt;
+  final int ticketPrice;
 
   CheckiEvent({
     this.id,
@@ -11,6 +12,7 @@ class CheckiEvent {
     required this.venue,
     required this.date,
     required this.createdAt,
+    this.ticketPrice = 0,
   });
 
   Map<String, dynamic> toMap() {
@@ -20,6 +22,7 @@ class CheckiEvent {
       'venue': venue,
       'date': date,
       'created_at': createdAt,
+      'ticket_price': ticketPrice,
     };
   }
 
@@ -30,6 +33,7 @@ class CheckiEvent {
       venue: map['venue'] as String,
       date: map['date'] as String,
       createdAt: map['created_at'] as String,
+      ticketPrice: (map['ticket_price'] as num?)?.toInt() ?? 0,
     );
   }
 }

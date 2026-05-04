@@ -1,8 +1,5 @@
-# events Specification
+## MODIFIED Requirements
 
-## Purpose
-活动实体的创建、查询、总览展示,以及与切奇记录的关联语义。活动作为一等公民承载"去过的场次"信息,既可挂载切奇记录,也可独立存在于纯打卡场景。
-## Requirements
 ### Requirement: 活动实体与存储
 
 系统 SHALL 使用独立 `events` 表持久化活动,字段为 `id (自增主键), name (活动名), venue (场地), date (演出日期 YYYY-MM-DD), created_at (录入时间戳), ticket_price (门票价格,非负整数)`。`ticket_price` SHALL 默认为 0,表示未记录门票价格或免费票。`(name, venue, date)` 三元组 MUST 唯一,重复创建 MUST 复用已有行而非插入新行。活动可以没有任何关联的 `records`(纯打卡场景)。
@@ -143,13 +140,3 @@
 
 - **WHEN** 用户点击"(未切奇)"的活动卡片,该活动 `ticket_price = 180`
 - **THEN** 详情页 SHALL 展示活动信息和门票 ¥180、切奇 ¥0、合计 ¥180,records 区域显示"暂无切奇记录"
-
-### Requirement: 活动无编辑删除 UI
-
-本版本 SHALL NOT 提供活动的编辑或删除 UI。用户如需修正错填的活动名,SHALL 通过新建一个正确的活动并在后续切奇时选择它来绕行;错填的活动行将在 DB 中保留(除非未来版本提供清理工具)。
-
-#### Scenario: 详情页不提供编辑删除操作
-
-- **WHEN** 用户长按或查看活动详情页
-- **THEN** 页面 NOT 展示"编辑活动"或"删除活动"按钮
-

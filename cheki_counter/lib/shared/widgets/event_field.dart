@@ -60,16 +60,16 @@ class _EventFieldState extends State<EventField> {
       },
       fieldViewBuilder:
           (context, textEditingController, focusNode, onFieldSubmitted) {
-        return TextFormField(
-          controller: textEditingController,
-          focusNode: focusNode,
-          decoration: const InputDecoration(
-            labelText: '活动(可选)',
-            border: OutlineInputBorder(),
-          ),
-          onFieldSubmitted: (_) => onFieldSubmitted(),
-        );
-      },
+            return TextFormField(
+              controller: textEditingController,
+              focusNode: focusNode,
+              decoration: const InputDecoration(
+                labelText: '活动(可选)',
+                border: OutlineInputBorder(),
+              ),
+              onFieldSubmitted: (_) => onFieldSubmitted(),
+            );
+          },
       optionsViewBuilder: (context, onSelected, options) {
         return Align(
           alignment: Alignment.topLeft,
@@ -87,17 +87,24 @@ class _EventFieldState extends State<EventField> {
                     onTap: () => onSelected(option),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(option.name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold)),
                           Text(
-                            '${option.date} · ${option.venue}',
+                            option.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            option.ticketPrice > 0
+                                ? '${option.date} · ${option.venue} · 票¥${option.ticketPrice}'
+                                : '${option.date} · ${option.venue}',
                             style: TextStyle(
-                                color: Colors.grey[600], fontSize: 12),
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),

@@ -33,6 +33,7 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
   final _priceController = TextEditingController();
   final _venueController = TextEditingController();
   final _eventController = TextEditingController();
+  final _ticketPriceController = TextEditingController();
   late DateTime _selectedDate;
   bool _isOnline = false;
   final _repo = RecordRepository();
@@ -56,6 +57,7 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
     _priceController.dispose();
     _venueController.dispose();
     _eventController.dispose();
+    _ticketPriceController.dispose();
     super.dispose();
   }
 
@@ -80,13 +82,15 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
       try {
         _selectedDate = DateTime.parse(e.date);
       } catch (_) {}
+      _ticketPriceController.text = e.ticketPrice > 0
+          ? e.ticketPrice.toString()
+          : '';
     });
   }
 
   Future<void> _onToggleOnline(bool on) async {
     if (on) {
-      final canonical =
-          (await _repo.canonicalVenueFor('电切')) ?? '电切';
+      final canonical = (await _repo.canonicalVenueFor('电切')) ?? '电切';
       if (!mounted) return;
       setState(() {
         _isOnline = true;
@@ -112,6 +116,10 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
     final canonicalVenue =
         (await _repo.canonicalVenueFor(trimmedVenue)) ?? trimmedVenue;
     final eventName = _eventController.text.trim();
+    final ticketPrice =
+        eventName.isEmpty || _ticketPriceController.text.trim().isEmpty
+        ? 0
+        : int.parse(_ticketPriceController.text.trim());
     final dateStr = formatDate(_selectedDate);
 
     final db = await DatabaseHelper.instance.database;
@@ -123,6 +131,7 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
           canonicalVenue,
           dateStr,
           nowIso,
+          ticketPrice: ticketPrice,
           executor: txn,
         );
       }
@@ -264,6 +273,22 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
                 controller: _eventController,
                 onEventSelected: _onEventSelected,
               ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _ticketPriceController,
+                decoration: const InputDecoration(
+                  labelText: '门票价格(可选)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  final text = v?.trim() ?? '';
+                  if (text.isEmpty) return null;
+                  final n = int.tryParse(text);
+                  if (n == null || n < 0) return '请输入非负整数';
+                  return null;
+                },
+              ),
             ],
           ),
         ),
@@ -273,10 +298,7 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('确定'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('确定')),
       ],
     );
   }

@@ -42,7 +42,9 @@ class _EventsOverviewPageState extends State<EventsOverviewPage> {
   Widget build(BuildContext context) {
     final totalEvents = _events.length;
     final withRecords = _events.where((e) => e.hasRecords).length;
-    final totalAmount = _events.fold(0, (sum, e) => sum + e.totalAmount);
+    final totalTicketAmount = _events.fold(0, (sum, e) => sum + e.ticketPrice);
+    final totalChekiAmount = _events.fold(0, (sum, e) => sum + e.totalAmount);
+    final grandAmount = _events.fold(0, (sum, e) => sum + e.grandAmount);
 
     return Scaffold(
       appBar: AppBar(
@@ -71,46 +73,85 @@ class _EventsOverviewPageState extends State<EventsOverviewPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _events.isEmpty
-              ? const Center(child: Text('暂无活动'))
-              : Column(
-                  children: [
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _events.length,
-                        itemBuilder: (context, i) {
-                          final s = _events[i];
-                          return EventCard(
-                            summary: s,
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => EventDetailPage(
-                                    eventId: s.event.id!,
-                                  ),
-                                ),
-                              );
-                              if (mounted) _load();
-                            },
+          ? const Center(child: Text('暂无活动'))
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _events.length,
+                    itemBuilder: (context, i) {
+                      final s = _events[i];
+                      return EventCard(
+                        summary: s,
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  EventDetailPage(eventId: s.event.id!),
+                            ),
                           );
+                          if (mounted) _load();
                         },
-                      ),
-                    ),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      child: Text(
-                        '$totalEvents 场 · $withRecords 场有切奇 · ¥$totalAmount',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
+                      );
+                    },
+                  ),
                 ),
+                EventTotalsBar(
+                  totalEvents: totalEvents,
+                  withRecords: withRecords,
+                  totalTicketAmount: totalTicketAmount,
+                  totalChekiAmount: totalChekiAmount,
+                  grandAmount: grandAmount,
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class EventTotalsBar extends StatelessWidget {
+  final int totalEvents;
+  final int withRecords;
+  final int totalTicketAmount;
+  final int totalChekiAmount;
+  final int grandAmount;
+
+  const EventTotalsBar({
+    super.key,
+    required this.totalEvents,
+    required this.withRecords,
+    required this.totalTicketAmount,
+    required this.totalChekiAmount,
+    required this.grandAmount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: Theme.of(context).colorScheme.primaryContainer,
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 10,
+        runSpacing: 4,
+        children:
+            [
+                  Text('$totalEvents 场'),
+                  Text('$withRecords 场有切奇'),
+                  Text('门票 ¥$totalTicketAmount'),
+                  Text('切 ¥$totalChekiAmount'),
+                  Text('合计 ¥$grandAmount'),
+                ]
+                .map(
+                  (w) => DefaultTextStyle.merge(
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    child: w,
+                  ),
+                )
+                .toList(),
+      ),
     );
   }
 }

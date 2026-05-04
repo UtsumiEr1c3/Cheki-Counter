@@ -25,6 +25,7 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
   final _priceController = TextEditingController(text: '60');
   final _venueController = TextEditingController();
   final _eventController = TextEditingController();
+  final _ticketPriceController = TextEditingController();
   late DateTime _selectedDate;
   String _selectedColor = presetColorNames.first;
   bool _isOnline = false;
@@ -47,6 +48,7 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
     _priceController.dispose();
     _venueController.dispose();
     _eventController.dispose();
+    _ticketPriceController.dispose();
     super.dispose();
   }
 
@@ -59,13 +61,15 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
       try {
         _selectedDate = DateTime.parse(e.date);
       } catch (_) {}
+      _ticketPriceController.text = e.ticketPrice > 0
+          ? e.ticketPrice.toString()
+          : '';
     });
   }
 
   Future<void> _onToggleOnline(bool on) async {
     if (on) {
-      final canonical =
-          (await _recordRepo.canonicalVenueFor('电切')) ?? '电切';
+      final canonical = (await _recordRepo.canonicalVenueFor('电切')) ?? '电切';
       if (!mounted) return;
       setState(() {
         _isOnline = true;
@@ -117,6 +121,10 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
         (await _recordRepo.canonicalVenueFor(trimmedVenue)) ?? trimmedVenue;
 
     final eventName = _eventController.text.trim();
+    final ticketPrice =
+        eventName.isEmpty || _ticketPriceController.text.trim().isEmpty
+        ? 0
+        : int.parse(_ticketPriceController.text.trim());
     int? eventId;
     if (eventName.isNotEmpty) {
       eventId = await _eventRepo.upsertByTriple(
@@ -124,6 +132,7 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
         canonicalVenue,
         dateStr,
         nowIso,
+        ticketPrice: ticketPrice,
       );
     }
 
@@ -203,8 +212,10 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
               ],
               const SizedBox(height: 16),
               const Divider(),
-              const Text('首条切奇记录',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                '首条切奇记录',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 4),
               // 电切 switch
               SwitchListTile(
@@ -284,6 +295,22 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
                 controller: _eventController,
                 onEventSelected: _onEventSelected,
               ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _ticketPriceController,
+                decoration: const InputDecoration(
+                  labelText: '门票价格(可选)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  final text = v?.trim() ?? '';
+                  if (text.isEmpty) return null;
+                  final n = int.tryParse(text);
+                  if (n == null || n < 0) return '请输入非负整数';
+                  return null;
+                },
+              ),
             ],
           ),
         ),
@@ -293,10 +320,7 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('确定'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('确定')),
       ],
     );
   }
@@ -336,10 +360,13 @@ class _ColorGrid extends StatelessWidget {
               ),
             ),
             child: isSelected
-                ? Icon(Icons.check,
+                ? Icon(
+                    Icons.check,
                     size: 16,
-                    color:
-                        color.computeLuminance() > 0.5 ? Colors.black : Colors.white)
+                    color: color.computeLuminance() > 0.5
+                        ? Colors.black
+                        : Colors.white,
+                  )
                 : null,
           ),
         );

@@ -8,6 +8,7 @@ class EventWithSummary {
   final int totalAmount;
   final int recordCount;
   final List<IdolSummaryEntry> idolSummary;
+  final int ticketPrice;
 
   EventWithSummary({
     required this.event,
@@ -15,9 +16,11 @@ class EventWithSummary {
     required this.totalAmount,
     required this.recordCount,
     required this.idolSummary,
+    required this.ticketPrice,
   });
 
   bool get hasRecords => recordCount > 0;
+  int get grandAmount => ticketPrice + totalAmount;
 }
 
 class IdolSummaryEntry {
@@ -40,24 +43,37 @@ class EventRepository {
     String venue,
     String date,
     String createdAt, {
+    int ticketPrice = 0,
     DatabaseExecutor? executor,
   }) async {
     final db = executor ?? await _db;
     final existing = await db.query(
       'events',
-      columns: ['id'],
+      columns: ['id', 'ticket_price'],
       where: 'name = ? AND venue = ? AND date = ?',
       whereArgs: [name, venue, date],
       limit: 1,
     );
     if (existing.isNotEmpty) {
-      return existing.first['id'] as int;
+      final row = existing.first;
+      final id = row['id'] as int;
+      final existingTicketPrice = (row['ticket_price'] as num?)?.toInt() ?? 0;
+      if (existingTicketPrice == 0 && ticketPrice > 0) {
+        await db.update(
+          'events',
+          {'ticket_price': ticketPrice},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
+      return id;
     }
     return await db.insert('events', {
       'name': name,
       'venue': venue,
       'date': date,
       'created_at': createdAt,
+      'ticket_price': ticketPrice,
     });
   }
 
@@ -87,7 +103,9 @@ class EventRepository {
     return rows.map((r) => r['year'] as String).toList();
   }
 
-  Future<List<EventWithSummary>> getAllWithRecordsSummary({String? year}) async {
+  Future<List<EventWithSummary>> getAllWithRecordsSummary({
+    String? year,
+  }) async {
     final db = await _db;
 
     final conditions = <String>[
@@ -102,6 +120,7 @@ class EventRepository {
 
     final eventRows = await db.rawQuery('''
       SELECT e.id, e.name, e.venue, e.date, e.created_at,
+             e.ticket_price,
              COALESCE(SUM(r.count), 0) AS total_count,
              COALESCE(SUM(r.subtotal), 0) AS total_amount,
              COUNT(r.id) AS record_count
@@ -128,11 +147,15 @@ class EventRepository {
     final byEvent = <int, List<IdolSummaryEntry>>{};
     for (final row in idolRows) {
       final eid = row['event_id'] as int;
-      byEvent.putIfAbsent(eid, () => []).add(IdolSummaryEntry(
-            name: row['name'] as String,
-            color: row['color'] as String,
-            count: (row['cnt'] as num).toInt(),
-          ));
+      byEvent
+          .putIfAbsent(eid, () => [])
+          .add(
+            IdolSummaryEntry(
+              name: row['name'] as String,
+              color: row['color'] as String,
+              count: (row['cnt'] as num).toInt(),
+            ),
+          );
     }
 
     return eventRows.map((r) {
@@ -143,6 +166,7 @@ class EventRepository {
         totalAmount: (r['total_amount'] as num).toInt(),
         recordCount: (r['record_count'] as num).toInt(),
         idolSummary: byEvent[id] ?? const [],
+        ticketPrice: (r['ticket_price'] as num?)?.toInt() ?? 0,
       );
     }).toList();
   }

@@ -37,10 +37,11 @@ class CsvService {
     '活动场地',
     '活动日期',
     '电切',
+    '门票价格',
   ];
 
   /// Import CSV from file bytes. Merge-append semantics.
-  /// Accepts both legacy 9-column and new 11-column formats.
+  /// Accepts legacy 9/11/12/13-column formats and the 14-column format.
   Future<ImportResult> importCsv(List<int> bytes) async {
     final result = ImportResult();
 
@@ -93,6 +94,24 @@ class CsvService {
         final eventName = col(9);
         final eventVenue = col(10);
         final eventDate = col(11);
+        final hasEvent =
+            eventName.isNotEmpty &&
+            eventVenue.isNotEmpty &&
+            eventDate.isNotEmpty;
+
+        var ticketPrice = 0;
+        if (hasEvent && row.length > 13) {
+          final rawTicketPrice = col(13);
+          if (rawTicketPrice.isNotEmpty) {
+            final parsed = int.tryParse(rawTicketPrice);
+            if (parsed == null || parsed < 0) {
+              result.errors++;
+              result.errorDetails.add('行$lineNum: 门票价格无效,已按0处理');
+            } else {
+              ticketPrice = parsed;
+            }
+          }
+        }
 
         // is_online (col 12, new in 13-column format)
         bool isOnline = false;
@@ -111,11 +130,8 @@ class CsvService {
 
         // Resolve event first (shared across both sides)
         int? eventId;
-        final hasEvent = eventName.isNotEmpty &&
-            eventVenue.isNotEmpty &&
-            eventDate.isNotEmpty;
-
-        final hasRecord = name.isNotEmpty &&
+        final hasRecord =
+            name.isNotEmpty &&
             date.isNotEmpty &&
             venue.isNotEmpty &&
             countVal.toString().trim().isNotEmpty &&
@@ -131,15 +147,14 @@ class CsvService {
             eventVenue,
             eventDate,
           );
-          if (existingEvent != null) {
-            eventId = existingEvent;
-          } else {
-            eventId = await _eventRepo.upsertByTriple(
-              eventName,
-              eventVenue,
-              eventDate,
-              createdAt.isNotEmpty ? createdAt : DateTime.now().toIso8601String(),
-            );
+          eventId = await _eventRepo.upsertByTriple(
+            eventName,
+            eventVenue,
+            eventDate,
+            createdAt.isNotEmpty ? createdAt : DateTime.now().toIso8601String(),
+            ticketPrice: ticketPrice,
+          );
+          if (existingEvent == null) {
             result.newEvents++;
           }
         }
@@ -254,6 +269,7 @@ class CsvService {
              r.venue AS r_venue, r.created_at AS r_created,
              r.is_online AS r_is_online,
              e.name AS e_name, e.venue AS e_venue, e.date AS e_date,
+             e.ticket_price AS e_ticket_price,
              COALESCE(e.date, r.date) AS sort_date, r.id AS r_id
       FROM records r
       JOIN idols i ON i.id = r.idol_id
@@ -263,7 +279,7 @@ class CsvService {
 
     final pureEventRows = await db.rawQuery('''
       SELECT e.name AS e_name, e.venue AS e_venue, e.date AS e_date,
-             e.created_at AS e_created
+             e.created_at AS e_created, e.ticket_price AS e_ticket_price
       FROM events e
       WHERE NOT EXISTS (
         SELECT 1 FROM records r WHERE r.event_id = e.id
@@ -274,18 +290,18 @@ class CsvService {
     // Merge-sort by event date (desc), keeping record rows' tie-break by r.id.
     final combined = <_ExportRow>[];
     for (final r in recordRows) {
-      combined.add(_ExportRow(
-        sortDate: r['sort_date'] as String? ?? '',
-        isRecord: true,
-        data: r,
-      ));
+      combined.add(
+        _ExportRow(
+          sortDate: r['sort_date'] as String? ?? '',
+          isRecord: true,
+          data: r,
+        ),
+      );
     }
     for (final e in pureEventRows) {
-      combined.add(_ExportRow(
-        sortDate: e['e_date'] as String,
-        isRecord: false,
-        data: e,
-      ));
+      combined.add(
+        _ExportRow(sortDate: e['e_date'] as String, isRecord: false, data: e),
+      );
     }
     combined.sort((a, b) => b.sortDate.compareTo(a.sortDate));
 
@@ -308,15 +324,26 @@ class CsvService {
             d['e_venue'] ?? '',
             d['e_date'] ?? '',
             (d['r_is_online'] as int?) == 1 ? '1' : '0',
+            d['e_name'] == null
+                ? ''
+                : ((d['e_ticket_price'] as int?) ?? 0).toString(),
           ];
         } else {
           return [
-            '', '', '', '', '', '', '', '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
             d['e_created'] ?? '',
             d['e_name'] ?? '',
             d['e_venue'] ?? '',
             d['e_date'] ?? '',
             '0',
+            ((d['e_ticket_price'] as int?) ?? 0).toString(),
           ];
         }
       }),

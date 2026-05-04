@@ -6,11 +6,7 @@ class EventCard extends StatelessWidget {
   final EventWithSummary summary;
   final VoidCallback? onTap;
 
-  const EventCard({
-    super.key,
-    required this.summary,
-    this.onTap,
-  });
+  const EventCard({super.key, required this.summary, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -54,17 +50,40 @@ class EventCard extends StatelessWidget {
                             style: TextStyle(color: Colors.grey[500]),
                           ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    summary.hasRecords ? '¥${summary.totalAmount}' : '—',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                children: [
+                  _AmountText(label: '票', value: '¥${summary.ticketPrice}'),
+                  _AmountText(
+                    label: '切',
+                    value: summary.hasRecords ? '¥${summary.totalAmount}' : '—',
                   ),
+                  _AmountText(label: '合计', value: '¥${summary.grandAmount}'),
                 ],
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AmountText extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _AmountText({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '$label $value',
+      style: const TextStyle(fontWeight: FontWeight.bold),
     );
   }
 }

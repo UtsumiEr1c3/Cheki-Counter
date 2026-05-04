@@ -40,9 +40,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final event = _event;
     if (event == null) {
@@ -58,14 +56,12 @@ class _EventDetailPageState extends State<EventDetailPage> {
       grouped.putIfAbsent(idolId, () => []).add(r);
     }
 
-    final totalCount = _records.fold<int>(
-      0,
-      (s, r) => s + (r['count'] as int),
-    );
+    final totalCount = _records.fold<int>(0, (s, r) => s + (r['count'] as int));
     final totalAmount = _records.fold<int>(
       0,
       (s, r) => s + (r['subtotal'] as int),
     );
+    final grandAmount = event.ticketPrice + totalAmount;
 
     return Scaffold(
       appBar: AppBar(title: Text(event.name)),
@@ -87,10 +83,17 @@ class _EventDetailPageState extends State<EventDetailPage> {
                 ),
                 const SizedBox(height: 4),
                 Text('${event.date} · ${event.venue}'),
-                if (_records.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text('共 $totalCount 切 · ¥$totalAmount'),
-                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
+                  children: [
+                    Text('共 $totalCount 切'),
+                    Text('门票 ¥${event.ticketPrice}'),
+                    Text('切 ¥$totalAmount'),
+                    Text('合计 ¥$grandAmount'),
+                  ],
+                ),
               ],
             ),
           ),
@@ -139,9 +142,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
                     (r) => ListTile(
                       dense: true,
                       title: Text('${r['count']} 切 · ¥${r['subtotal']}'),
-                      subtitle: Text(
-                        '${r['venue']}  单价¥${r['unit_price']}',
-                      ),
+                      subtitle: Text('${r['venue']}  单价¥${r['unit_price']}'),
                     ),
                   ),
                 ],

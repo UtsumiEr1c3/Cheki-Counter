@@ -13,13 +13,18 @@ class DatabaseHelper {
     return _database!;
   }
 
+  Future<void> close() async {
+    await _database?.close();
+    _database = null;
+  }
+
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = p.join(dbPath, 'cheki_counter.db');
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -43,7 +48,8 @@ class DatabaseHelper {
         name TEXT NOT NULL,
         venue TEXT NOT NULL,
         date TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        ticket_price INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -93,6 +99,11 @@ class DatabaseHelper {
         UPDATE records SET is_online = 1
         WHERE LOWER(venue) LIKE '%电切%' OR LOWER(venue) LIKE '%電切%'
       ''');
+    }
+    if (oldVersion < 4) {
+      await db.execute(
+        'ALTER TABLE events ADD COLUMN ticket_price INTEGER NOT NULL DEFAULT 0',
+      );
     }
   }
 }

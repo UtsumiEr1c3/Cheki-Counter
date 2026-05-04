@@ -15,6 +15,7 @@ class _AddEventDialogState extends State<AddEventDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _venueController = TextEditingController();
+  final _ticketPriceController = TextEditingController();
   late DateTime _selectedDate;
   final _eventRepo = EventRepository();
   final _recordRepo = RecordRepository();
@@ -29,6 +30,7 @@ class _AddEventDialogState extends State<AddEventDialog> {
   void dispose() {
     _nameController.dispose();
     _venueController.dispose();
+    _ticketPriceController.dispose();
     super.dispose();
   }
 
@@ -52,9 +54,18 @@ class _AddEventDialogState extends State<AddEventDialog> {
     final canonicalVenue =
         (await _recordRepo.canonicalVenueFor(trimmedVenue)) ?? trimmedVenue;
     final date = formatDate(_selectedDate);
+    final ticketPrice = _ticketPriceController.text.trim().isEmpty
+        ? 0
+        : int.parse(_ticketPriceController.text.trim());
     final now = DateTime.now().toIso8601String();
 
-    await _eventRepo.upsertByTriple(name, canonicalVenue, date, now);
+    await _eventRepo.upsertByTriple(
+      name,
+      canonicalVenue,
+      date,
+      now,
+      ticketPrice: ticketPrice,
+    );
     if (mounted) Navigator.of(context).pop(true);
   }
 
@@ -99,6 +110,22 @@ class _AddEventDialogState extends State<AddEventDialog> {
                   child: Text(formatDate(_selectedDate)),
                 ),
               ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _ticketPriceController,
+                decoration: const InputDecoration(
+                  labelText: '门票价格(可选)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  final text = v?.trim() ?? '';
+                  if (text.isEmpty) return null;
+                  final n = int.tryParse(text);
+                  if (n == null || n < 0) return '请输入非负整数';
+                  return null;
+                },
+              ),
             ],
           ),
         ),
@@ -108,10 +135,7 @@ class _AddEventDialogState extends State<AddEventDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('确定'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('确定')),
       ],
     );
   }
