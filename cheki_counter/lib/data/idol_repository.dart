@@ -18,7 +18,8 @@ class IdolRepository {
 
     final String query;
     if (year != null) {
-      query = '''
+      query =
+          '''
         SELECT i.id, i.name, i.color, i.group_name, i.created_at,
                SUM(r.count) AS total_count,
                SUM(r.subtotal) AS total_amount
@@ -29,7 +30,8 @@ class IdolRepository {
         ORDER BY $orderCol DESC
       ''';
     } else {
-      query = '''
+      query =
+          '''
         SELECT i.id, i.name, i.color, i.group_name, i.created_at,
                COALESCE(SUM(r.count), 0) AS total_count,
                COALESCE(SUM(r.subtotal), 0) AS total_amount
@@ -46,7 +48,11 @@ class IdolRepository {
   }
 
   /// Find idol by (name, color, group) triple.
-  Future<Idol?> findByTriple(String name, String color, String groupName) async {
+  Future<Idol?> findByTriple(
+    String name,
+    String color,
+    String groupName,
+  ) async {
     final db = await _db;
     final results = await db.query(
       'idols',
@@ -70,18 +76,54 @@ class IdolRepository {
     return idolId;
   }
 
-  /// Get aggregates for groups.
-  Future<List<Map<String, dynamic>>> getGroupAggregates() async {
+  /// Get idols in one group with aggregated count and amount.
+  /// [sortBy] can be 'count' or 'amount'.
+  /// [year] filters records by year (null = all).
+  Future<List<Idol>> getByGroupWithAggregates({
+    required String groupName,
+    String sortBy = 'count',
+    String? year,
+  }) async {
     final db = await _db;
+    final orderCol = sortBy == 'amount' ? 'total_amount' : 'total_count';
+    final whereParts = ['i.group_name = ?'];
+    final args = <Object?>[groupName];
+    if (year != null) {
+      whereParts.add("strftime('%Y', r.date) = ?");
+      args.add(year);
+    }
+
+    final results = await db.rawQuery('''
+      SELECT i.id, i.name, i.color, i.group_name, i.created_at,
+             SUM(r.count) AS total_count,
+             SUM(r.subtotal) AS total_amount
+      FROM idols i
+      INNER JOIN records r ON r.idol_id = i.id
+      WHERE ${whereParts.join(' AND ')}
+      GROUP BY i.id
+      ORDER BY $orderCol DESC
+    ''', args);
+
+    return results.map((row) => Idol.fromMap(row)).toList();
+  }
+
+  /// Get aggregates for groups.
+  /// [year] filters records by year (null = all).
+  Future<List<Map<String, dynamic>>> getGroupAggregates({String? year}) async {
+    final db = await _db;
+    final where = year == null ? '' : "WHERE strftime('%Y', r.date) = ?";
+    final args = year == null ? <Object?>[] : <Object?>[year];
+
     return await db.rawQuery('''
       SELECT i.group_name,
              COUNT(DISTINCT i.id) AS idol_count,
-             COALESCE(SUM(r.count), 0) AS total_count,
-             COALESCE(SUM(r.subtotal), 0) AS total_amount
+             SUM(r.count) AS total_count,
+             SUM(r.subtotal) AS total_amount
       FROM idols i
-      LEFT JOIN records r ON r.idol_id = i.id
+      INNER JOIN records r ON r.idol_id = i.id
+      $where
       GROUP BY i.group_name
       ORDER BY total_count DESC
-    ''');
+    ''', args);
   }
 }

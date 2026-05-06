@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:cheki_counter/data/csv_service.dart';
 import 'package:cheki_counter/data/db.dart';
 import 'package:cheki_counter/data/event_repository.dart';
+import 'package:cheki_counter/data/idol_repository.dart';
 import 'package:cheki_counter/data/models/event.dart';
 import 'package:cheki_counter/features/events/event_card.dart';
 import 'package:cheki_counter/features/events/events_overview_page.dart';
+import 'package:cheki_counter/features/statistics/group_detail_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -293,6 +295,80 @@ void main() {
     expect(find.text('切 ¥2450'), findsOneWidget);
     expect(find.text('合计 ¥4610'), findsOneWidget);
   });
+
+  test('IdolRepository filters group aggregates by year', () async {
+    await _seedGroupStatisticsData();
+    final repo = IdolRepository();
+
+    final allGroups = await repo.getGroupAggregates();
+    final allEaux = allGroups.firstWhere((g) => g['group_name'] == 'EAUX');
+    expect(allEaux['idol_count'], 2);
+    expect(allEaux['total_count'], 6);
+    expect(allEaux['total_amount'], 550);
+
+    final groups2026 = await repo.getGroupAggregates(year: '2026');
+    expect(groups2026, hasLength(1));
+    expect(groups2026.single['group_name'], 'EAUX');
+    expect(groups2026.single['idol_count'], 2);
+    expect(groups2026.single['total_count'], 3);
+    expect(groups2026.single['total_amount'], 340);
+  });
+
+  test('IdolRepository returns group idols by year and sort mode', () async {
+    await _seedGroupStatisticsData();
+    final repo = IdolRepository();
+
+    final byCount = await repo.getByGroupWithAggregates(
+      groupName: 'EAUX',
+      year: '2026',
+    );
+    expect(byCount.map((idol) => idol.name), ['小五', '花枝']);
+    expect(byCount.map((idol) => idol.totalCount), [2, 1]);
+
+    final byAmount = await repo.getByGroupWithAggregates(
+      groupName: 'EAUX',
+      year: '2026',
+      sortBy: 'amount',
+    );
+    expect(byAmount.map((idol) => idol.name), ['花枝', '小五']);
+    expect(byAmount.map((idol) => idol.totalAmount), [200, 140]);
+  });
+
+  testWidgets('GroupDetailPage inherits year and sorts by amount', (
+    tester,
+  ) async {
+    await _seedGroupStatisticsData();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        routes: {
+          '/idol-detail': (_) => const Scaffold(body: Text('idol detail')),
+        },
+        home: const GroupDetailPage(groupName: 'EAUX', initialYear: '2026'),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('2026年'), findsOneWidget);
+    expect(find.text('小五'), findsOneWidget);
+    expect(find.text('花枝'), findsOneWidget);
+    expect(find.text('¥340'), findsOneWidget);
+
+    expect(
+      tester.getTopLeft(find.text('小五')).dy,
+      lessThan(tester.getTopLeft(find.text('花枝')).dy),
+    );
+
+    await tester.tap(find.text('按金额'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      tester.getTopLeft(find.text('花枝')).dy,
+      lessThan(tester.getTopLeft(find.text('小五')).dy),
+    );
+  });
 }
 
 Future<String> _databasePath() async {
@@ -303,6 +379,69 @@ Future<String> _databasePath() async {
 Future<void> _resetTestDatabase() async {
   await DatabaseHelper.instance.close();
   await deleteDatabase(await _databasePath());
+}
+
+Future<void> _seedGroupStatisticsData() async {
+  final db = await DatabaseHelper.instance.database;
+  final xiaowu = await db.insert('idols', {
+    'name': '小五',
+    'color': '蓝色',
+    'group_name': 'EAUX',
+    'created_at': '2026-01-01T00:00:00',
+  });
+  final huazhi = await db.insert('idols', {
+    'name': '花枝',
+    'color': '红色',
+    'group_name': 'EAUX',
+    'created_at': '2026-01-01T00:00:01',
+  });
+  final heita = await db.insert('idols', {
+    'name': '黑塔',
+    'color': '绿色',
+    'group_name': '心率研究所',
+    'created_at': '2026-01-01T00:00:02',
+  });
+
+  await db.insert('records', {
+    'idol_id': xiaowu,
+    'date': '2026-05-04',
+    'count': 2,
+    'unit_price': 70,
+    'subtotal': 140,
+    'venue': '上海摩登天空',
+    'created_at': '2026-05-04T12:00:00',
+    'is_online': 0,
+  });
+  await db.insert('records', {
+    'idol_id': huazhi,
+    'date': '2026-05-04',
+    'count': 1,
+    'unit_price': 200,
+    'subtotal': 200,
+    'venue': '上海摩登天空',
+    'created_at': '2026-05-04T12:01:00',
+    'is_online': 0,
+  });
+  await db.insert('records', {
+    'idol_id': xiaowu,
+    'date': '2025-12-24',
+    'count': 3,
+    'unit_price': 70,
+    'subtotal': 210,
+    'venue': '育音堂',
+    'created_at': '2025-12-24T12:00:00',
+    'is_online': 0,
+  });
+  await db.insert('records', {
+    'idol_id': heita,
+    'date': '2025-12-25',
+    'count': 1,
+    'unit_price': 70,
+    'subtotal': 70,
+    'venue': '育音堂',
+    'created_at': '2025-12-25T12:00:00',
+    'is_online': 0,
+  });
 }
 
 class _FakeEventExecutor implements DatabaseExecutor {
