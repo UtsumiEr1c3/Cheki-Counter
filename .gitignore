@@ -1,5 +1,7 @@
 /csv/
 /UIReference/
+/.codex/
+/.claude/
 # Miscellaneous
 *.class
 *.lock
