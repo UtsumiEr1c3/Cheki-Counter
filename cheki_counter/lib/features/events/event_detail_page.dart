@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cheki_counter/data/event_repository.dart';
 import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/data/models/event.dart';
+import 'package:cheki_counter/features/events/event_cheki_dialog.dart';
 import 'package:cheki_counter/shared/colors.dart';
 
 class EventDetailPage extends StatefulWidget {
@@ -27,6 +28,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
   }
 
   Future<void> _load() async {
+    if (mounted) setState(() => _loading = true);
     final event = await _eventRepo.getById(widget.eventId);
     final records = await _recordRepo.getByEventId(widget.eventId);
     if (!mounted) return;
@@ -35,6 +37,16 @@ class _EventDetailPageState extends State<EventDetailPage> {
       _records = records;
       _loading = false;
     });
+  }
+
+  Future<void> _openAddCheki(CheckiEvent event) async {
+    final added = await showDialog<bool>(
+      context: context,
+      builder: (_) => EventChekiDialog(event: event),
+    );
+    if (added == true && mounted) {
+      await _load();
+    }
   }
 
   @override
@@ -65,6 +77,11 @@ class _EventDetailPageState extends State<EventDetailPage> {
 
     return Scaffold(
       appBar: AppBar(title: Text(event.name)),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openAddCheki(event),
+        icon: const Icon(Icons.add),
+        label: const Text('添加切奇'),
+      ),
       body: ListView(
         children: [
           Container(

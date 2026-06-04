@@ -6,6 +6,16 @@ import 'package:cheki_counter/data/models/record.dart';
 class IdolRepository {
   Future<Database> get _db => DatabaseHelper.instance.database;
 
+  /// Get all idols for selection controls.
+  Future<List<Idol>> getAllForSelection() async {
+    final db = await _db;
+    final results = await db.query(
+      'idols',
+      orderBy: 'name ASC, group_name ASC, id ASC',
+    );
+    return results.map((row) => Idol.fromMap(row)).toList();
+  }
+
   /// Get all idols with aggregated count and amount.
   /// [sortBy] can be 'count' or 'amount'.
   /// [year] filters records by year (null = all).
