@@ -2,6 +2,8 @@
 /UIReference/
 /.codex/
 /.claude/
+/.codegraph/
+
 # Miscellaneous
 *.class
 *.lock
