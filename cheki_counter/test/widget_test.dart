@@ -5,9 +5,11 @@ import 'package:cheki_counter/data/csv_service.dart';
 import 'package:cheki_counter/data/db.dart';
 import 'package:cheki_counter/data/event_repository.dart';
 import 'package:cheki_counter/data/idol_repository.dart';
+import 'package:cheki_counter/data/models/idol.dart';
 import 'package:cheki_counter/data/models/event.dart';
 import 'package:cheki_counter/features/events/event_card.dart';
 import 'package:cheki_counter/features/events/events_overview_page.dart';
+import 'package:cheki_counter/features/idol_detail/edit_idol_dialog.dart';
 import 'package:cheki_counter/features/statistics/group_detail_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -131,12 +133,23 @@ void main() {
       'date': '2026-04-20',
       'created_at': '2026-04-01T12:00:00',
     });
+    await oldDb.insert('idols', {
+      'name': '小五',
+      'color': '蓝色',
+      'group_name': 'EAUX',
+      'created_at': '2026-04-01T12:00:00',
+    });
     await oldDb.close();
 
     final upgradedDb = await DatabaseHelper.instance.database;
     final rows = await upgradedDb.query('events');
+    final idolsInfo = await upgradedDb.rawQuery('PRAGMA table_info(idols)');
+    final idols = await upgradedDb.query('idols');
 
     expect(rows.single['ticket_price'], 0);
+    expect(idolsInfo.any((row) => row['name'] == 'stable_id'), isTrue);
+    expect(idols.single['stable_id'], isA<String>());
+    expect(idols.single['stable_id'], isNotEmpty);
   });
 
   test('CSV import treats 13-column rows as ticket price zero', () async {
@@ -160,8 +173,8 @@ void main() {
     final first = await service.importCsv(
       utf8.encode(
         [
-          '偶像名,应援色,团体,日期,数量,单价,小计,场地,创建时间,活动名,活动场地,活动日期,电切,门票价格',
-          '小五,蓝色,EAUX,2026-04-20,2,70,140.00,武汉MAO,2026-04-20T10:00:00,VoltFes 2.0,武汉MAO,2026-04-20,0,180',
+          '偶像ID,偶像名,应援色,团体,日期,数量,单价,小计,场地,创建时间,活动名,活动场地,活动日期,电切,门票价格',
+          'idol_test_1,小五,蓝色,EAUX,2026-04-20,2,70,140.00,武汉MAO,2026-04-20T10:00:00,VoltFes 2.0,武汉MAO,2026-04-20,0,180',
         ].join('\n'),
       ),
     );
@@ -184,6 +197,52 @@ void main() {
     expect(events.single['ticket_price'], 180);
     expect(records, hasLength(1));
   });
+
+  test(
+    'CSV import uses stable id without overwriting local idol profile',
+    () async {
+      final service = CsvService();
+      await service.importCsv(
+        utf8.encode(
+          [
+            '偶像ID,偶像名,应援色,团体,日期,数量,单价,小计,场地,创建时间,活动名,活动场地,活动日期,电切,门票价格',
+            'idol_stable_1,小五,蓝色,EAUX,2026-04-20,2,70,140.00,武汉MAO,2026-04-20T10:00:00,,,,0,',
+          ].join('\n'),
+        ),
+      );
+      final repo = IdolRepository();
+      final idol = await repo.findByStableId('idol_stable_1');
+      await repo.updateCurrentProfile(
+        idolId: idol!.id!,
+        name: '小伍',
+        color: '红色',
+        groupName: '新EAUX',
+      );
+
+      final result = await service.importCsv(
+        utf8.encode(
+          [
+            '偶像ID,偶像名,应援色,团体,日期,数量,单价,小计,场地,创建时间,活动名,活动场地,活动日期,电切,门票价格',
+            'idol_stable_1,小五,蓝色,EAUX,2026-04-21,1,70,70.00,武汉MAO,2026-04-21T10:00:00,,,,0,',
+          ].join('\n'),
+        ),
+      );
+      final updated = await repo.findByStableId('idol_stable_1');
+      final db = await DatabaseHelper.instance.database;
+      final records = await db.query(
+        'records',
+        where: 'idol_id = ?',
+        whereArgs: [idol.id],
+      );
+
+      expect(result.newIdols, 0);
+      expect(result.newRecords, 1);
+      expect(updated!.name, '小伍');
+      expect(updated.color, '红色');
+      expect(updated.groupName, '新EAUX');
+      expect(records, hasLength(2));
+    },
+  );
 
   test('CSV export can be imported again without duplicate data', () async {
     final tempDir = Directory.systemTemp.createTempSync('cheki_csv_test_');
@@ -296,6 +355,37 @@ void main() {
     expect(find.text('合计 ¥4610'), findsOneWidget);
   });
 
+  testWidgets(
+    'EditIdolDialog prefills current idol profile and validates name',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EditIdolDialog(
+              idol: Idol(
+                id: 1,
+                stableId: 'idol_test',
+                name: '小五',
+                color: '蓝色',
+                groupName: 'EAUX',
+                createdAt: '2026-01-01T00:00:00',
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.widgetWithText(TextFormField, '小五'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'EAUX'), findsOneWidget);
+
+      await tester.enterText(find.widgetWithText(TextFormField, '小五'), '');
+      await tester.tap(find.text('保存'));
+      await tester.pump();
+
+      expect(find.text('请填写名字'), findsOneWidget);
+    },
+  );
+
   test('IdolRepository filters group aggregates by year', () async {
     await _seedGroupStatisticsData();
     final repo = IdolRepository();
@@ -384,18 +474,21 @@ Future<void> _resetTestDatabase() async {
 Future<void> _seedGroupStatisticsData() async {
   final db = await DatabaseHelper.instance.database;
   final xiaowu = await db.insert('idols', {
+    'stable_id': 'idol_seed_xiaowu',
     'name': '小五',
     'color': '蓝色',
     'group_name': 'EAUX',
     'created_at': '2026-01-01T00:00:00',
   });
   final huazhi = await db.insert('idols', {
+    'stable_id': 'idol_seed_huazhi',
     'name': '花枝',
     'color': '红色',
     'group_name': 'EAUX',
     'created_at': '2026-01-01T00:00:01',
   });
   final heita = await db.insert('idols', {
+    'stable_id': 'idol_seed_heita',
     'name': '黑塔',
     'color': '绿色',
     'group_name': '心率研究所',

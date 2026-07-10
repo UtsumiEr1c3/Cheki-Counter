@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:cheki_counter/data/idol_repository.dart';
+import 'package:cheki_counter/data/models/idol.dart';
 import 'package:cheki_counter/data/record_repository.dart';
+import 'package:cheki_counter/features/idol_detail/edit_idol_dialog.dart';
 import 'package:cheki_counter/shared/colors.dart';
 
 class IdolDetailPage extends StatefulWidget {
@@ -21,6 +24,8 @@ class IdolDetailPage extends StatefulWidget {
 
 class _IdolDetailPageState extends State<IdolDetailPage> {
   final _repo = RecordRepository();
+  final _idolRepo = IdolRepository();
+  Idol? _idol;
   List<IdolRecordRow> _records = [];
   bool _byMonth = false; // false = by day, true = by month
 
@@ -36,8 +41,14 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
   }
 
   Future<void> _load() async {
+    final idol = await _idolRepo.findById(widget.idolId);
     final records = await _repo.listByIdol(widget.idolId);
-    if (mounted) setState(() => _records = records);
+    if (mounted) {
+      setState(() {
+        _idol = idol;
+        _records = records;
+      });
+    }
   }
 
   Future<void> _deleteRecord(int recordId) async {
@@ -51,12 +62,21 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final idolColor = colorFor(widget.idolColor);
+    final currentIdol = _idol;
+    final idolName = currentIdol?.name ?? widget.idolName;
+    final idolColor = colorFor(currentIdol?.color ?? widget.idolColor);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.idolName),
+        title: Text(idolName),
         backgroundColor: idolColor.withAlpha(40),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: '编辑偶像',
+            onPressed: currentIdol == null ? null : _editIdol,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -68,18 +88,30 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Column(children: [
-                  Text('$_totalCount',
+                Column(
+                  children: [
+                    Text(
+                      '$_totalCount',
                       style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold)),
-                  const Text('总切数'),
-                ]),
-                Column(children: [
-                  Text('¥$_totalAmount',
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Text('总切数'),
+                  ],
+                ),
+                Column(
+                  children: [
+                    Text(
+                      '¥$_totalAmount',
                       style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold)),
-                  const Text('总金额'),
-                ]),
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Text('总金额'),
+                  ],
+                ),
               ],
             ),
           ),
@@ -126,10 +158,7 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
                   subtitle: hasEvent
                       ? Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(row.eventName!),
-                            Text(venueLine),
-                          ],
+                          children: [Text(row.eventName!), Text(venueLine)],
                         )
                       : Text(venueLine),
                   trailing: IconButton(
@@ -143,6 +172,18 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _editIdol() async {
+    final idol = _idol;
+    if (idol == null) return;
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => EditIdolDialog(idol: idol),
+    );
+    if (changed == true) {
+      await _load();
+    }
   }
 
   void _confirmDelete(int recordId) {
@@ -214,7 +255,10 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
                 final d = sortedDays[idx];
                 return SideTitleWidget(
                   meta: meta,
-                  child: Text(d.substring(5), style: const TextStyle(fontSize: 10)),
+                  child: Text(
+                    d.substring(5),
+                    style: const TextStyle(fontSize: 10),
+                  ),
                 );
               },
             ),
@@ -222,8 +266,12 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
           leftTitles: AxisTitles(
             sideTitles: SideTitles(showTitles: true, reservedSize: 32),
           ),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
         ),
         gridData: const FlGridData(show: true),
         borderData: FlBorderData(show: false),
@@ -249,8 +297,7 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
     final allMonths = <String>[];
     var cur = firstMonth;
     while (!cur.isAfter(lastMonth)) {
-      allMonths
-          .add('${cur.year}-${cur.month.toString().padLeft(2, '0')}');
+      allMonths.add('${cur.year}-${cur.month.toString().padLeft(2, '0')}');
       cur = DateTime(cur.year, cur.month + 1);
     }
 
@@ -277,8 +324,10 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
                 }
                 return SideTitleWidget(
                   meta: meta,
-                  child: Text(allMonths[idx].substring(5),
-                      style: const TextStyle(fontSize: 10)),
+                  child: Text(
+                    allMonths[idx].substring(5),
+                    style: const TextStyle(fontSize: 10),
+                  ),
                 );
               },
             ),
@@ -286,8 +335,12 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
           leftTitles: AxisTitles(
             sideTitles: SideTitles(showTitles: true, reservedSize: 32),
           ),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
         ),
         gridData: const FlGridData(show: true),
         borderData: FlBorderData(show: false),
@@ -302,10 +355,7 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
       color: color,
       barWidth: 2,
       dotData: const FlDotData(show: true),
-      belowBarData: BarAreaData(
-        show: true,
-        color: color.withAlpha(30),
-      ),
+      belowBarData: BarAreaData(show: true, color: color.withAlpha(30)),
     );
   }
 

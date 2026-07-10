@@ -24,6 +24,7 @@ class CsvService {
   final _eventRepo = EventRepository();
 
   static const _header = [
+    '偶像ID',
     '偶像名',
     '应援色',
     '团体',
@@ -41,7 +42,7 @@ class CsvService {
   ];
 
   /// Import CSV from file bytes. Merge-append semantics.
-  /// Accepts legacy 9/11/12/13-column formats and the 14-column format.
+  /// Accepts legacy 9/11/12/13/14-column formats and the 15-column format.
   Future<ImportResult> importCsv(List<int> bytes) async {
     final result = ImportResult();
 
@@ -62,7 +63,9 @@ class CsvService {
     if (rows.isEmpty) return result;
 
     final header = rows.first.map((e) => e.toString().trim()).toList();
-    if (header.length < 9) {
+    final hasStableIdColumn = header.isNotEmpty && header.first == '偶像ID';
+    final offset = hasStableIdColumn ? 1 : 0;
+    if (header.length < 9 + offset) {
       result.errors = 1;
       result.errorDetails.add('行1: 列数不足,期望至少9列');
       return result;
@@ -73,7 +76,7 @@ class CsvService {
       final lineNum = i + 1;
 
       try {
-        if (row.length < 9) {
+        if (row.length < 9 + offset) {
           throw const FormatException('列数不足');
         }
 
@@ -81,27 +84,28 @@ class CsvService {
             idx < row.length ? row[idx].toString().trim() : '';
 
         // Idol/record side
-        final name = col(0);
-        final color = col(1);
-        final group = col(2);
-        final date = col(3);
-        final countVal = row.length > 4 ? row[4] : '';
-        final priceVal = row.length > 5 ? row[5] : '';
-        final venue = col(7);
-        final createdAt = col(8);
+        final stableId = hasStableIdColumn ? col(0) : '';
+        final name = col(offset);
+        final color = col(offset + 1);
+        final group = col(offset + 2);
+        final date = col(offset + 3);
+        final countVal = row.length > offset + 4 ? row[offset + 4] : '';
+        final priceVal = row.length > offset + 5 ? row[offset + 5] : '';
+        final venue = col(offset + 7);
+        final createdAt = col(offset + 8);
 
         // Event side
-        final eventName = col(9);
-        final eventVenue = col(10);
-        final eventDate = col(11);
+        final eventName = col(offset + 9);
+        final eventVenue = col(offset + 10);
+        final eventDate = col(offset + 11);
         final hasEvent =
             eventName.isNotEmpty &&
             eventVenue.isNotEmpty &&
             eventDate.isNotEmpty;
 
         var ticketPrice = 0;
-        if (hasEvent && row.length > 13) {
-          final rawTicketPrice = col(13);
+        if (hasEvent && row.length > offset + 13) {
+          final rawTicketPrice = col(offset + 13);
           if (rawTicketPrice.isNotEmpty) {
             final parsed = int.tryParse(rawTicketPrice);
             if (parsed == null || parsed < 0) {
@@ -113,10 +117,10 @@ class CsvService {
           }
         }
 
-        // is_online (col 12, new in 13-column format)
+        // is_online (col 12 in legacy format, col 13 in stable-id format)
         bool isOnline = false;
-        if (row.length > 12) {
-          final raw = col(12);
+        if (row.length > offset + 12) {
+          final raw = col(offset + 12);
           if (raw == '1') {
             isOnline = true;
           } else if (raw.isEmpty || raw == '0') {
@@ -179,10 +183,13 @@ class CsvService {
         }
 
         // Find or create idol
-        var idol = await _idolRepo.findByTriple(name, color, group);
+        var idol = stableId.isNotEmpty
+            ? await _idolRepo.findByStableId(stableId)
+            : await _idolRepo.findByTriple(name, color, group);
         bool newIdol = false;
         if (idol == null) {
           final idolObj = Idol(
+            stableId: stableId,
             name: name,
             color: color,
             groupName: group,
@@ -203,7 +210,9 @@ class CsvService {
           result.newIdols++;
           result.newRecords++;
           newIdol = true;
-          idol = await _idolRepo.findByTriple(name, color, group);
+          idol = stableId.isNotEmpty
+              ? await _idolRepo.findByStableId(stableId)
+              : await _idolRepo.findByTriple(name, color, group);
         }
 
         if (!newIdol) {
@@ -264,7 +273,8 @@ class CsvService {
     final db = await DatabaseHelper.instance.database;
 
     final recordRows = await db.rawQuery('''
-      SELECT i.name AS idol_name, i.color AS idol_color, i.group_name,
+      SELECT i.stable_id AS idol_stable_id,
+             i.name AS idol_name, i.color AS idol_color, i.group_name,
              r.date AS r_date, r.count, r.unit_price, r.subtotal,
              r.venue AS r_venue, r.created_at AS r_created,
              r.is_online AS r_is_online,
@@ -311,6 +321,7 @@ class CsvService {
         final d = row.data;
         if (row.isRecord) {
           return [
+            d['idol_stable_id'] ?? '',
             d['idol_name'] ?? '',
             d['idol_color'] ?? '',
             d['group_name'] ?? '',
@@ -330,6 +341,7 @@ class CsvService {
           ];
         } else {
           return [
+            '',
             '',
             '',
             '',

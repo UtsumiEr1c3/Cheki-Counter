@@ -1,10 +1,20 @@
+import 'dart:math';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:cheki_counter/data/db.dart';
 import 'package:cheki_counter/data/models/idol.dart';
 import 'package:cheki_counter/data/models/record.dart';
 
 class IdolRepository {
+  final _random = Random.secure();
+
   Future<Database> get _db => DatabaseHelper.instance.database;
+
+  String generateStableId() {
+    final timestamp = DateTime.now().microsecondsSinceEpoch;
+    final suffix = _random.nextInt(0x7fffffff).toRadixString(16);
+    return 'idol_${timestamp}_$suffix';
+  }
 
   /// Get all idols for selection controls.
   Future<List<Idol>> getAllForSelection() async {
@@ -30,7 +40,7 @@ class IdolRepository {
     if (year != null) {
       query =
           '''
-        SELECT i.id, i.name, i.color, i.group_name, i.created_at,
+        SELECT i.id, i.stable_id, i.name, i.color, i.group_name, i.created_at,
                SUM(r.count) AS total_count,
                SUM(r.subtotal) AS total_amount
         FROM idols i
@@ -42,7 +52,7 @@ class IdolRepository {
     } else {
       query =
           '''
-        SELECT i.id, i.name, i.color, i.group_name, i.created_at,
+        SELECT i.id, i.stable_id, i.name, i.color, i.group_name, i.created_at,
                COALESCE(SUM(r.count), 0) AS total_count,
                COALESCE(SUM(r.subtotal), 0) AS total_amount
         FROM idols i
@@ -73,12 +83,81 @@ class IdolRepository {
     return Idol.fromMap(results.first);
   }
 
+  Future<Idol?> findByStableId(String stableId) async {
+    if (stableId.trim().isEmpty) return null;
+    final db = await _db;
+    final results = await db.query(
+      'idols',
+      where: 'stable_id = ?',
+      whereArgs: [stableId.trim()],
+      limit: 1,
+    );
+    if (results.isEmpty) return null;
+    return Idol.fromMap(results.first);
+  }
+
+  Future<Idol?> findById(int id) async {
+    final db = await _db;
+    final results = await db.query(
+      'idols',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (results.isEmpty) return null;
+    return Idol.fromMap(results.first);
+  }
+
+  Future<bool> hasTripleConflict({
+    required int idolId,
+    required String name,
+    required String color,
+    required String groupName,
+  }) async {
+    final db = await _db;
+    final results = await db.query(
+      'idols',
+      columns: ['id'],
+      where: 'name = ? AND color = ? AND group_name = ? AND id <> ?',
+      whereArgs: [name, color, groupName, idolId],
+      limit: 1,
+    );
+    return results.isNotEmpty;
+  }
+
+  Future<void> updateCurrentProfile({
+    required int idolId,
+    required String name,
+    required String color,
+    required String groupName,
+  }) async {
+    if (await hasTripleConflict(
+      idolId: idolId,
+      name: name,
+      color: color,
+      groupName: groupName,
+    )) {
+      throw DuplicateIdolTripleException();
+    }
+
+    final db = await _db;
+    await db.update(
+      'idols',
+      {'name': name, 'color': color, 'group_name': groupName},
+      where: 'id = ?',
+      whereArgs: [idolId],
+    );
+  }
+
   /// Insert a new idol with its first record in a single transaction.
   Future<int> insertWithFirstRecord(Idol idol, CheckiRecord record) async {
     final db = await _db;
     late int idolId;
     await db.transaction((txn) async {
-      idolId = await txn.insert('idols', idol.toMap());
+      final idolToInsert = idol.stableId.isEmpty
+          ? idol.copyWith(stableId: generateStableId())
+          : idol;
+      idolId = await txn.insert('idols', idolToInsert.toMap());
       final recordMap = record.toMap();
       recordMap['idol_id'] = idolId;
       await txn.insert('records', recordMap);
@@ -104,7 +183,7 @@ class IdolRepository {
     }
 
     final results = await db.rawQuery('''
-      SELECT i.id, i.name, i.color, i.group_name, i.created_at,
+      SELECT i.id, i.stable_id, i.name, i.color, i.group_name, i.created_at,
              SUM(r.count) AS total_count,
              SUM(r.subtotal) AS total_amount
       FROM idols i
@@ -137,3 +216,5 @@ class IdolRepository {
     ''', args);
   }
 }
+
+class DuplicateIdolTripleException implements Exception {}

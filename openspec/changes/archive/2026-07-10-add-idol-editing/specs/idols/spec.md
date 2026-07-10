@@ -1,8 +1,5 @@
-# idols Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change add-cheki-counter. Update Purpose after archive.
-## Requirements
 ### Requirement: 偶像存在性由切奇记录派生
 
 系统 SHALL 只保留至少有一条切奇记录的偶像;不允许"有偶像但零记录"的状态。偶像的本机稳定业务身份 SHALL 由 `idols.id` 唯一确定；偶像的对外导入导出身份 SHALL 由 `idols.stable_id` 唯一确定；`名字`、`应援色`、`团体` SHALL 表示该偶像的当前资料，并且当前三元组 `(名字, 应援色, 团体)` MUST 在 `idols` 表内保持唯一。新建偶像 popup (`AddIdolDialog`) 的"首条切奇记录"区域 SHALL 与 `AddRecordDialog` 字段齐平,包含日期、数量、单价、场地四个必填项,以及活动一个可选字段、门票价格一个可选字段和电切一个布尔开关。门票价格字段 SHALL 仅在活动字段非空时参与活动 upsert;留空 SHALL 按 0 处理,填写时 MUST 为非负整数。首条记录提交时:若活动字段非空,SHALL 对 `events` 执行 `upsertByTriple(活动名, 场地, 日期, 门票价格)` 并把返回的 `event.id` 写入该首条记录的 `event_id`,同时按 events capability 的门票价格补写规则处理 `events.ticket_price`;电切开关状态 SHALL 写入首条记录的 `is_online`。电切开关 ON 时场地字段 SHALL 被锁定为 canonical `电切` 且禁用编辑,与 `AddRecordDialog` 行为一致。
@@ -90,39 +87,6 @@ TBD - created by archiving change add-cheki-counter. Update Purpose after archiv
 - **WHEN** 用户编辑某偶像的名字、应援色或团体
 - **THEN** 该偶像已有 records 行的 `idol_id` SHALL 保持不变
 
-### Requirement: 主界面偶像卡片展示
-
-主界面 SHALL 以卡片网格展示当前所有偶像,每张卡片显示偶像名、切数、总金额,卡片边框颜色为偶像的应援色对应 hex,卡片右上角提供快速添加切奇的 `+` 按钮。
-
-#### Scenario: 卡片边框取自应援色
-
-- **WHEN** 渲染偶像卡片
-- **THEN** 边框颜色 MUST 来自应援色预设色表的 hex 值;若色名不在预设表则使用灰色兜底
-
-#### Scenario: 卡片 `+` 按钮直接打开添加切奇 popup
-
-- **WHEN** 用户点击偶像卡片右上角的 `+`
-- **THEN** 系统弹出添加切奇 popup,其中偶像名、应援色、团体字段被锁定为该偶像的三元组
-
-#### Scenario: 点击卡片进入个人详情页
-
-- **WHEN** 用户点击卡片主体区域(非 `+` 按钮)
-- **THEN** 系统导航到该偶像的个人统计页
-
-### Requirement: 主界面汇总与排序
-
-主界面顶部 SHALL 显示总切数、总偶像数、总金额三项汇总;卡片列表 SHALL 支持"按切数降序"与"按金额降序"两种排序方式,用户可通过 UI 切换。
-
-#### Scenario: 汇总随数据变化实时刷新
-
-- **WHEN** 用户添加或删除一条切奇记录
-- **THEN** 顶部总切数、总金额 MUST 立即反映新值;若新建或删除的偶像影响总偶像数,总偶像数也同步更新
-
-#### Scenario: 切换排序方式
-
-- **WHEN** 用户在主界面选择"按金额"排序
-- **THEN** 卡片网格按各偶像的总金额降序重排,切换到"按切数"后按总切数降序重排
-
 ### Requirement: 活动详情页新建偶像并附带首条本场记录
 
 系统 SHALL 允许用户从活动详情页的新建偶像路径创建全新偶像。该路径 SHALL 要求填写偶像名字、应援色、团体, 以及首条本场切奇记录所需的数量和单价。系统 SHALL 使用当前活动的 `id`、`date` 和 `venue` 创建首条 records 行, 并在同一事务中插入 idols 行和 records 行。系统 MUST 保持当前 `(名字, 应援色, 团体)` 三元组唯一语义; 若三元组已存在, SHALL 拒绝新建偶像并提示用户改用已有偶像路径添加记录。
@@ -147,6 +111,8 @@ TBD - created by archiving change add-cheki-counter. Update Purpose after archiv
 - **WHEN** 用户从活动详情页新建偶像但未填写数量或单价
 - **THEN** 系统 SHALL 拒绝提交并显示校验错误, 不允许产生无 records 的空偶像
 
+## ADDED Requirements
+
 ### Requirement: 偶像 stable_id
 
 系统 SHALL 为每个 `idols` 行持久化一个 `stable_id` 字段。`stable_id` MUST 非空且在本地数据库中唯一。系统 MUST NOT 使用 SQLite 自增 `id` 作为 CSV 对外身份；新建偶像时 SHALL 生成新的 `stable_id`，升级既有数据库时 SHALL 为每个已有偶像回填新的 `stable_id`。
@@ -165,4 +131,3 @@ TBD - created by archiving change add-cheki-counter. Update Purpose after archiv
 
 - **WHEN** 用户修改某偶像的名字、应援色或团体
 - **THEN** 该偶像的 `stable_id` SHALL 保持不变
-

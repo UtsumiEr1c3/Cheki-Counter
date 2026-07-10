@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 
@@ -24,7 +26,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -35,12 +37,17 @@ class DatabaseHelper {
       CREATE TABLE idols (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
+        stable_id TEXT NOT NULL,
         color TEXT NOT NULL,
         group_name TEXT NOT NULL,
         created_at TEXT NOT NULL,
         UNIQUE (name, color, group_name)
       )
     ''');
+
+    await db.execute(
+      'CREATE UNIQUE INDEX idx_idols_stable_id ON idols(stable_id)',
+    );
 
     await db.execute('''
       CREATE TABLE events (
@@ -105,5 +112,28 @@ class DatabaseHelper {
         'ALTER TABLE events ADD COLUMN ticket_price INTEGER NOT NULL DEFAULT 0',
       );
     }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE idols ADD COLUMN stable_id TEXT');
+      final rows = await db.query('idols', columns: ['id']);
+      final random = Random.secure();
+      for (final row in rows) {
+        final id = row['id'] as int;
+        await db.update(
+          'idols',
+          {'stable_id': _generateStableId(random, id)},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
+      await db.execute(
+        'CREATE UNIQUE INDEX idx_idols_stable_id ON idols(stable_id)',
+      );
+    }
+  }
+
+  String _generateStableId(Random random, int id) {
+    final timestamp = DateTime.now().microsecondsSinceEpoch;
+    final suffix = random.nextInt(0x7fffffff).toRadixString(16);
+    return 'idol_${timestamp}_${id}_$suffix';
   }
 }
