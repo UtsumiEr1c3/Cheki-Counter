@@ -1,8 +1,5 @@
-# idol-editing Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change add-idol-editing. Update Purpose after archive.
-## Requirements
 ### Requirement: 编辑已有偶像当前资料
 
 系统 SHALL 提供编辑已有偶像当前资料的入口，允许用户修改偶像名字、应援色名称、实际色值和团体。表单 SHALL 准确回显当前颜色名称与实际色值，并提供与创建偶像相同的预设色和调色盘选择能力。提交成功后，系统 MUST 更新同一条 `idols` 行，保留该偶像的 `id`、`stable_id`、`created_at` 和所有既有 `records.idol_id` 引用。
@@ -46,25 +43,6 @@ TBD - created by archiving change add-idol-editing. Update Purpose after archive
 - **WHEN** 用户保留已选颜色但清空颜色名称并点击提交
 - **THEN** 系统 SHALL 拒绝提交并在颜色名称字段显示校验错误
 
-### Requirement: 编辑三元组冲突处理
-
-系统 SHALL 在提交偶像编辑前检查目标 `(名字, 应援色, 团体)` 是否已被其他 `idols.id` 占用。若目标三元组属于当前正在编辑的偶像，提交 SHALL 被视为无冲突；若属于另一个偶像，系统 MUST 拒绝提交。
-
-#### Scenario: 编辑为另一个偶像的三元组被拒绝
-
-- **WHEN** 已存在偶像 A `(雪梨, 紫色, 心率研究所)` 和偶像 B `(小五, 蓝色, EAUX)`，用户将 B 编辑为 `(雪梨, 紫色, 心率研究所)`
-- **THEN** 系统 SHALL 拒绝提交，并提示已存在相同名字、应援色和团体的偶像
-
-#### Scenario: 未修改三元组允许提交
-
-- **WHEN** 用户打开偶像 A 的编辑表单，不改变名字、应援色、团体直接提交
-- **THEN** 系统 SHALL 接受提交或关闭表单，不得因为当前偶像自己的三元组而报重复
-
-#### Scenario: 同名同色不同团体允许共存
-
-- **WHEN** 已存在偶像 `(雪梨, 紫色, 心率研究所)`，用户将另一个偶像编辑为 `(雪梨, 紫色, 其他团体)`
-- **THEN** 系统 SHALL 允许提交，因为完整三元组不同
-
 ### Requirement: 编辑后界面刷新
 
 系统 SHALL 在偶像资料编辑成功后刷新所有展示该偶像当前资料的界面，包括主界面卡片、偶像详情页标题与图表、活动详情页的偶像颜色、添加切奇弹窗中的锁定字段，以及相关统计展示。所有视觉颜色 SHALL 使用编辑后的持久化实际色值。
@@ -83,4 +61,3 @@ TBD - created by archiving change add-idol-editing. Update Purpose after archive
 
 - **WHEN** 用户将偶像实际色值修改为 `#3478F6` 并保存
 - **THEN** 偶像详情背景与图表、首页卡片、活动详情和统计视图 SHALL 在重新加载后使用 `#3478F6`
-

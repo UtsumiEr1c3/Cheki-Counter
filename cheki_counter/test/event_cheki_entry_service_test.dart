@@ -3,7 +3,9 @@ import 'package:cheki_counter/data/idol_repository.dart';
 import 'package:cheki_counter/data/models/event.dart';
 import 'package:cheki_counter/data/models/idol.dart';
 import 'package:cheki_counter/data/models/record.dart';
+import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/features/events/event_cheki_entry_service.dart';
+import 'package:cheki_counter/shared/colors.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -29,6 +31,7 @@ void main() {
       Idol(
         name: 'Momo',
         color: '粉色',
+        colorValue: colorValueForName('粉色'),
         groupName: 'EAUX',
         createdAt: '2026-01-01T00:00:00',
       ),
@@ -46,6 +49,7 @@ void main() {
       Idol(
         name: 'Aki',
         color: '蓝色',
+        colorValue: colorValueForName('蓝色'),
         groupName: 'EAUX',
         createdAt: '2026-01-02T00:00:00',
       ),
@@ -72,6 +76,7 @@ void main() {
       Idol(
         name: 'Aki',
         color: '蓝色',
+        colorValue: colorValueForName('蓝色'),
         groupName: 'EAUX',
         createdAt: '2026-01-01T00:00:00',
       ),
@@ -106,6 +111,7 @@ void main() {
         id: idolId,
         name: 'Aki',
         color: '蓝色',
+        colorValue: colorValueForName('蓝色'),
         groupName: 'EAUX',
         createdAt: '2026-01-01T00:00:00',
       ),
@@ -152,7 +158,8 @@ void main() {
       final idolId = await EventChekiEntryService().createIdolWithEventRecord(
         event: event,
         name: 'Rin',
-        color: '红色',
+        color: '星空蓝',
+        colorValue: 0xFF3478F6,
         groupName: 'EAUX',
         count: 2,
         unitPrice: 80,
@@ -171,6 +178,8 @@ void main() {
       );
 
       expect(idols.single['name'], 'Rin');
+      expect(idols.single['color'], '星空蓝');
+      expect(idols.single['color_value'], 0xFF3478F6);
       expect(idols.single['stable_id'], isA<String>());
       expect(idols.single['stable_id'], isNotEmpty);
       expect(records, hasLength(1));
@@ -179,6 +188,10 @@ void main() {
       expect(records.single['venue'], 'Wuhan MAO');
       expect(records.single['subtotal'], 160);
       expect(records.single['is_online'], 0);
+
+      final eventRows = await RecordRepository().getByEventId(event.id!);
+      expect(eventRows.single['idol_color'], '星空蓝');
+      expect(eventRows.single['idol_color_value'], 0xFF3478F6);
     },
   );
 
@@ -204,6 +217,7 @@ void main() {
         event: event,
         name: 'Rin',
         color: '红色',
+        colorValue: colorValueForName('红色'),
         groupName: 'EAUX',
         count: 2,
         unitPrice: 80,
@@ -215,6 +229,7 @@ void main() {
           event: event,
           name: 'Rin',
           color: '红色',
+          colorValue: colorValueForName('红色'),
           groupName: 'EAUX',
           count: 1,
           unitPrice: 80,
@@ -237,6 +252,7 @@ void main() {
         Idol(
           name: 'Aki',
           color: '蓝色',
+          colorValue: colorValueForName('蓝色'),
           groupName: 'EAUX',
           createdAt: '2026-01-01T00:00:00',
         ),
@@ -260,6 +276,7 @@ void main() {
         idolId: idolId,
         name: 'Aki',
         color: '红色',
+        colorValue: colorValueForName('红色'),
         groupName: 'New EAUX',
       );
 
@@ -273,6 +290,7 @@ void main() {
       expect(after['id'], before['id']);
       expect(after['stable_id'], before['stable_id']);
       expect(after['color'], '红色');
+      expect(after['color_value'], colorValueForName('红色'));
       expect(after['group_name'], 'New EAUX');
       expect(records.single['idol_id'], idolId);
     },
@@ -284,6 +302,7 @@ void main() {
       Idol(
         name: 'Aki',
         color: '蓝色',
+        colorValue: colorValueForName('蓝色'),
         groupName: 'EAUX',
         createdAt: '2026-01-01T00:00:00',
       ),
@@ -301,6 +320,7 @@ void main() {
       Idol(
         name: 'Rin',
         color: '红色',
+        colorValue: colorValueForName('红色'),
         groupName: 'Other',
         createdAt: '2026-01-02T00:00:00',
       ),
@@ -320,6 +340,7 @@ void main() {
         idolId: secondId,
         name: 'Aki',
         color: '蓝色',
+        colorValue: colorValueForName('蓝色'),
         groupName: 'EAUX',
       ),
       throwsA(isA<DuplicateIdolTripleException>()),

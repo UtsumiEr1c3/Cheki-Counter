@@ -5,6 +5,7 @@ import 'package:cheki_counter/data/models/idol.dart';
 import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/features/events/event_cheki_entry_service.dart';
 import 'package:cheki_counter/shared/colors.dart';
+import 'package:cheki_counter/shared/widgets/idol_color_field.dart';
 
 enum _EntryMode { existing, create }
 
@@ -32,6 +33,7 @@ class _EventChekiDialogState extends State<EventChekiDialog> {
   List<Idol> _idols = [];
   int? _selectedIdolId;
   String _selectedColor = presetColorNames.first;
+  int _selectedColorValue = colorValueForName(presetColorNames.first);
   bool _loadingIdols = true;
   bool _saving = false;
   String? _duplicateError;
@@ -91,6 +93,7 @@ class _EventChekiDialogState extends State<EventChekiDialog> {
           event: widget.event,
           name: _nameController.text,
           color: _selectedColor,
+          colorValue: _selectedColorValue,
           groupName: _groupController.text,
           count: count,
           unitPrice: unitPrice,
@@ -220,37 +223,12 @@ class _EventChekiDialogState extends State<EventChekiDialog> {
           },
         ),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedColor,
-          decoration: const InputDecoration(
-            labelText: '应援色',
-            border: OutlineInputBorder(),
-          ),
-          items: presetColorNames
-              .map(
-                (name) => DropdownMenuItem(
-                  value: name,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: colorFor(name),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.black12),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(name),
-                    ],
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (value) {
-            if (value != null) setState(() => _selectedColor = value);
+        IdolColorField(
+          initialName: _selectedColor,
+          initialColorValue: _selectedColorValue,
+          onChanged: (selection) {
+            _selectedColor = selection.name;
+            _selectedColorValue = selection.colorValue;
           },
         ),
         const SizedBox(height: 12),

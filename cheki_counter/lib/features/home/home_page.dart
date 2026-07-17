@@ -35,9 +35,7 @@ class _HomePageState extends State<HomePage> {
             onPressed: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const EventsOverviewPage(),
-                ),
+                MaterialPageRoute(builder: (_) => const EventsOverviewPage()),
               );
               if (context.mounted) context.read<IdolListNotifier>().refresh();
             },
@@ -104,11 +102,11 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.all(8),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      childAspectRatio: 0.9,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                    ),
+                          crossAxisCount: 3,
+                          childAspectRatio: 0.9,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
                     itemCount: notifier.idols.length,
                     itemBuilder: (context, index) {
                       final idol = notifier.idols[index];
@@ -122,6 +120,7 @@ class _HomePageState extends State<HomePage> {
                               'idolId': idol.id,
                               'idolName': idol.name,
                               'idolColor': idol.color,
+                              'idolColorValue': idol.colorValue,
                             },
                           );
                           if (context.mounted) {
@@ -135,6 +134,7 @@ class _HomePageState extends State<HomePage> {
                               idolId: idol.id!,
                               idolName: idol.name,
                               idolColor: idol.color,
+                              idolColorValue: idol.colorValue,
                               idolGroup: idol.groupName,
                             ),
                           );
@@ -180,10 +180,7 @@ class _HomePageState extends State<HomePage> {
     if (!context.mounted || choice == null) return;
 
     if (choice == 'idol') {
-      await showDialog(
-        context: context,
-        builder: (_) => const AddIdolDialog(),
-      );
+      await showDialog(context: context, builder: (_) => const AddIdolDialog());
     } else if (choice == 'event') {
       await showDialog(
         context: context,

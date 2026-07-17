@@ -40,7 +40,8 @@ class IdolRepository {
     if (year != null) {
       query =
           '''
-        SELECT i.id, i.stable_id, i.name, i.color, i.group_name, i.created_at,
+        SELECT i.id, i.stable_id, i.name, i.color, i.color_value,
+               i.group_name, i.created_at,
                SUM(r.count) AS total_count,
                SUM(r.subtotal) AS total_amount
         FROM idols i
@@ -52,7 +53,8 @@ class IdolRepository {
     } else {
       query =
           '''
-        SELECT i.id, i.stable_id, i.name, i.color, i.group_name, i.created_at,
+        SELECT i.id, i.stable_id, i.name, i.color, i.color_value,
+               i.group_name, i.created_at,
                COALESCE(SUM(r.count), 0) AS total_count,
                COALESCE(SUM(r.subtotal), 0) AS total_amount
         FROM idols i
@@ -129,6 +131,7 @@ class IdolRepository {
     required int idolId,
     required String name,
     required String color,
+    required int colorValue,
     required String groupName,
   }) async {
     if (await hasTripleConflict(
@@ -143,7 +146,12 @@ class IdolRepository {
     final db = await _db;
     await db.update(
       'idols',
-      {'name': name, 'color': color, 'group_name': groupName},
+      {
+        'name': name,
+        'color': color,
+        'color_value': colorValue,
+        'group_name': groupName,
+      },
       where: 'id = ?',
       whereArgs: [idolId],
     );
@@ -183,7 +191,8 @@ class IdolRepository {
     }
 
     final results = await db.rawQuery('''
-      SELECT i.id, i.stable_id, i.name, i.color, i.group_name, i.created_at,
+      SELECT i.id, i.stable_id, i.name, i.color, i.color_value,
+             i.group_name, i.created_at,
              SUM(r.count) AS total_count,
              SUM(r.subtotal) AS total_amount
       FROM idols i

@@ -2,6 +2,9 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+/// 无法从名称或外部文本恢复颜色时使用的固定灰色。
+const int fallbackIdolColorValue = 0xFF9E9E9E;
+
 /// 20 preset fan colors: Chinese name -> hex.
 const Map<String, int> presetColors = {
   '红色': 0xFFE53935,
@@ -26,16 +29,41 @@ const Map<String, int> presetColors = {
   '酒红': 0xFFC62828,
 };
 
-/// Get the Color for a given Chinese color name.
-/// Returns grey if the name is not in the preset table.
-Color colorFor(String name) {
-  final hex = presetColors[name];
-  if (hex == null) return Colors.grey;
-  return Color(hex);
+/// 根据名称取得预设 ARGB；未知名称使用固定灰色。
+int colorValueForName(String name) {
+  return presetColors[name] ?? fallbackIdolColorValue;
 }
 
-/// All preset color names in display order.
+/// 将任意 RGB/ARGB 整数规范为不透明 ARGB。
+int opaqueColorValue(int value) {
+  return 0xFF000000 | (value & 0x00FFFFFF);
+}
+
+/// 将持久化 ARGB 转为 Flutter 颜色。
+Color colorFromValue(int value) {
+  return Color(opaqueColorValue(value));
+}
+
+/// 根据中文颜色名取得颜色；主要用于预设色和旧数据兜底。
+Color colorFor(String name) {
+  return colorFromValue(colorValueForName(name));
+}
+
+/// 按展示顺序返回全部预设色名称。
 List<String> get presetColorNames => presetColors.keys.toList();
+
+/// 将不透明 ARGB 格式化为大写 `#RRGGBB`。
+String colorValueToHex(int value) {
+  final rgb = value & 0x00FFFFFF;
+  return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+}
+
+/// 解析严格的 `#RRGGBB` 文本；格式无效时返回 null。
+int? tryParseColorHex(String input) {
+  final text = input.trim();
+  if (!RegExp(r'^#[0-9A-Fa-f]{6}$').hasMatch(text)) return null;
+  return 0xFF000000 | int.parse(text.substring(1), radix: 16);
+}
 
 /// Return a chart-safe version of [color]: when the color is too light to
 /// render on a pale card background (relative luminance > 0.7), darken it by

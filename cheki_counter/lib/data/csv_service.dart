@@ -8,6 +8,7 @@ import 'package:cheki_counter/data/idol_repository.dart';
 import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/data/models/idol.dart';
 import 'package:cheki_counter/data/models/record.dart';
+import 'package:cheki_counter/shared/colors.dart';
 
 class ImportResult {
   int newIdols = 0;
@@ -39,6 +40,7 @@ class CsvService {
     '活动日期',
     '电切',
     '门票价格',
+    '应援色值',
   ];
 
   /// Import CSV from file bytes. Merge-append semantics.
@@ -64,6 +66,7 @@ class CsvService {
 
     final header = rows.first.map((e) => e.toString().trim()).toList();
     final hasStableIdColumn = header.isNotEmpty && header.first == '偶像ID';
+    final colorValueIndex = header.indexOf('应援色值');
     final offset = hasStableIdColumn ? 1 : 0;
     if (header.length < 9 + offset) {
       result.errors = 1;
@@ -141,6 +144,27 @@ class CsvService {
             countVal.toString().trim().isNotEmpty &&
             priceVal.toString().trim().isNotEmpty;
 
+        var colorValue = colorValueForName(color);
+        if (hasRecord && colorValueIndex >= 0) {
+          final rawColorValue = col(colorValueIndex);
+          if (rawColorValue.isNotEmpty) {
+            final parsed = tryParseColorHex(rawColorValue);
+            if (parsed == null) {
+              result.errors++;
+              result.errorDetails.add('行$lineNum: 应援色值无效,已按灰色处理');
+              colorValue = fallbackIdolColorValue;
+            } else {
+              colorValue = parsed;
+            }
+          } else if (!presetColors.containsKey(color)) {
+            result.errors++;
+            result.errorDetails.add('行$lineNum: 无法从应援色名称恢复色值,已按灰色处理');
+          }
+        } else if (hasRecord && !presetColors.containsKey(color)) {
+          result.errors++;
+          result.errorDetails.add('行$lineNum: 无法从旧格式恢复应援色值,已按灰色处理');
+        }
+
         if (!hasEvent && !hasRecord) {
           throw const FormatException('既无偶像也无活动');
         }
@@ -192,6 +216,7 @@ class CsvService {
             stableId: stableId,
             name: name,
             color: color,
+            colorValue: colorValue,
             groupName: group,
             createdAt: createdAt,
           );
@@ -274,7 +299,8 @@ class CsvService {
 
     final recordRows = await db.rawQuery('''
       SELECT i.stable_id AS idol_stable_id,
-             i.name AS idol_name, i.color AS idol_color, i.group_name,
+             i.name AS idol_name, i.color AS idol_color,
+             i.color_value AS idol_color_value, i.group_name,
              r.date AS r_date, r.count, r.unit_price, r.subtotal,
              r.venue AS r_venue, r.created_at AS r_created,
              r.is_online AS r_is_online,
@@ -338,6 +364,7 @@ class CsvService {
             d['e_name'] == null
                 ? ''
                 : ((d['e_ticket_price'] as int?) ?? 0).toString(),
+            colorValueToHex(d['idol_color_value'] as int),
           ];
         } else {
           return [
@@ -356,6 +383,7 @@ class CsvService {
             d['e_date'] ?? '',
             '0',
             ((d['e_ticket_price'] as int?) ?? 0).toString(),
+            '',
           ];
         }
       }),

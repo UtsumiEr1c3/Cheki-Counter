@@ -12,10 +12,7 @@ class ChekiCounterApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Cheki Counter',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.pink,
-        useMaterial3: true,
-      ),
+      theme: ThemeData(colorSchemeSeed: Colors.pink, useMaterial3: true),
       initialRoute: '/',
       routes: {
         '/': (context) => const HomePage(),
@@ -31,6 +28,7 @@ class ChekiCounterApp extends StatelessWidget {
               idolId: args['idolId'] as int,
               idolName: args['idolName'] as String,
               idolColor: args['idolColor'] as String,
+              idolColorValue: args['idolColorValue'] as int,
             ),
           );
         }

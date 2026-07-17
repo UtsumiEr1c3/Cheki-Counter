@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cheki_counter/data/idol_repository.dart';
 import 'package:cheki_counter/data/models/idol.dart';
-import 'package:cheki_counter/shared/colors.dart';
+import 'package:cheki_counter/shared/widgets/idol_color_field.dart';
 
 class EditIdolDialog extends StatefulWidget {
   final Idol idol;
@@ -18,6 +18,7 @@ class _EditIdolDialogState extends State<EditIdolDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _groupController;
   late String _selectedColor;
+  late int _selectedColorValue;
   String? _tripleError;
 
   @override
@@ -25,9 +26,8 @@ class _EditIdolDialogState extends State<EditIdolDialog> {
     super.initState();
     _nameController = TextEditingController(text: widget.idol.name);
     _groupController = TextEditingController(text: widget.idol.groupName);
-    _selectedColor = presetColors.containsKey(widget.idol.color)
-        ? widget.idol.color
-        : presetColorNames.first;
+    _selectedColor = widget.idol.color;
+    _selectedColorValue = widget.idol.colorValue;
   }
 
   @override
@@ -45,7 +45,8 @@ class _EditIdolDialogState extends State<EditIdolDialog> {
       await _repo.updateCurrentProfile(
         idolId: widget.idol.id!,
         name: _nameController.text.trim(),
-        color: _selectedColor,
+        color: _selectedColor.trim(),
+        colorValue: _selectedColorValue,
         groupName: _groupController.text.trim(),
       );
       if (mounted) Navigator.of(context).pop(true);
@@ -80,11 +81,13 @@ class _EditIdolDialogState extends State<EditIdolDialog> {
                 },
               ),
               const SizedBox(height: 12),
-              const Text('应援色', style: TextStyle(fontSize: 14)),
-              const SizedBox(height: 4),
-              _EditColorGrid(
-                selected: _selectedColor,
-                onSelected: (color) => setState(() => _selectedColor = color),
+              IdolColorField(
+                initialName: _selectedColor,
+                initialColorValue: _selectedColorValue,
+                onChanged: (selection) {
+                  _selectedColor = selection.name;
+                  _selectedColorValue = selection.colorValue;
+                },
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -116,55 +119,6 @@ class _EditIdolDialogState extends State<EditIdolDialog> {
         ),
         FilledButton(onPressed: _submit, child: const Text('保存')),
       ],
-    );
-  }
-}
-
-class _EditColorGrid extends StatelessWidget {
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  const _EditColorGrid({required this.selected, required this.onSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    final names = presetColorNames;
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 5,
-        crossAxisSpacing: 6,
-        mainAxisSpacing: 6,
-      ),
-      itemCount: names.length,
-      itemBuilder: (context, index) {
-        final name = names[index];
-        final color = colorFor(name);
-        final isSelected = name == selected;
-        return GestureDetector(
-          onTap: () => onSelected(name),
-          child: Container(
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: isSelected ? Colors.black : Colors.grey[300]!,
-                width: isSelected ? 3 : 1,
-              ),
-            ),
-            child: isSelected
-                ? Icon(
-                    Icons.check,
-                    size: 16,
-                    color: color.computeLuminance() > 0.5
-                        ? Colors.black
-                        : Colors.white,
-                  )
-                : null,
-          ),
-        );
-      },
     );
   }
 }

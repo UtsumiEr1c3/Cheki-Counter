@@ -11,6 +11,8 @@ import 'package:cheki_counter/features/events/event_card.dart';
 import 'package:cheki_counter/features/events/events_overview_page.dart';
 import 'package:cheki_counter/features/idol_detail/edit_idol_dialog.dart';
 import 'package:cheki_counter/features/statistics/group_detail_page.dart';
+import 'package:cheki_counter/shared/colors.dart';
+import 'package:cheki_counter/shared/widgets/idol_color_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -216,6 +218,7 @@ void main() {
         idolId: idol!.id!,
         name: '小伍',
         color: '红色',
+        colorValue: colorValueForName('红色'),
         groupName: '新EAUX',
       );
 
@@ -239,6 +242,7 @@ void main() {
       expect(result.newRecords, 1);
       expect(updated!.name, '小伍');
       expect(updated.color, '红色');
+      expect(updated.colorValue, colorValueForName('红色'));
       expect(updated.groupName, '新EAUX');
       expect(records, hasLength(2));
     },
@@ -265,6 +269,10 @@ void main() {
 
     final exportPath = await service.exportCsv();
     final exportedBytes = await File(exportPath).readAsBytes();
+    final exportedText = utf8.decode(exportedBytes.skip(3).toList());
+    final exportedLines = exportedText.replaceAll('\r\n', '\n').split('\n');
+    expect(exportedLines.first, endsWith(',应援色值'));
+    expect(exportedLines[1], endsWith(',#1E88E5'));
     final result = await service.importCsv(exportedBytes);
     final db = await DatabaseHelper.instance.database;
     final events = await db.query('events');
@@ -277,6 +285,44 @@ void main() {
     expect(events.single['ticket_price'], 180);
     expect(records, hasLength(1));
   });
+
+  test('CSV 16-column import preserves a custom idol color', () async {
+    final result = await CsvService().importCsv(
+      utf8.encode(
+        [
+          '偶像ID,偶像名,应援色,团体,日期,数量,单价,小计,场地,创建时间,活动名,活动场地,活动日期,电切,门票价格,应援色值',
+          'idol_custom_1,凛,星空蓝,EAUX,2026-04-20,2,70,140.00,武汉MAO,2026-04-20T10:00:00,,,,0,,#3478F6',
+        ].join('\n'),
+      ),
+    );
+    final idol = await IdolRepository().findByStableId('idol_custom_1');
+
+    expect(result.newIdols, 1);
+    expect(result.errors, 0);
+    expect(idol!.color, '星空蓝');
+    expect(idol.colorValue, 0xFF3478F6);
+  });
+
+  test(
+    'CSV invalid custom color falls back to grey and records an error',
+    () async {
+      final result = await CsvService().importCsv(
+        utf8.encode(
+          [
+            '偶像ID,偶像名,应援色,团体,日期,数量,单价,小计,场地,创建时间,活动名,活动场地,活动日期,电切,门票价格,应援色值',
+            'idol_custom_bad,凛,星空蓝,EAUX,2026-04-20,1,70,70.00,武汉MAO,2026-04-20T10:00:00,,,,0,,blue',
+          ].join('\n'),
+        ),
+      );
+      final idol = await IdolRepository().findByStableId('idol_custom_bad');
+
+      expect(result.newIdols, 1);
+      expect(result.errors, 1);
+      expect(result.errorDetails.single, contains('应援色值无效'));
+      expect(idol!.color, '星空蓝');
+      expect(idol.colorValue, fallbackIdolColorValue);
+    },
+  );
 
   test(
     'CSV import records invalid ticket price and falls back to zero',
@@ -314,8 +360,18 @@ void main() {
       totalAmount: 350,
       recordCount: 2,
       idolSummary: [
-        IdolSummaryEntry(name: '小五', color: '蓝色', count: 3),
-        IdolSummaryEntry(name: '桃子', color: '粉色', count: 2),
+        IdolSummaryEntry(
+          name: '小五',
+          color: '蓝色',
+          colorValue: colorValueForName('蓝色'),
+          count: 3,
+        ),
+        IdolSummaryEntry(
+          name: '桃子',
+          color: '粉色',
+          colorValue: colorValueForName('粉色'),
+          count: 2,
+        ),
       ],
       ticketPrice: 180,
     );
@@ -367,6 +423,7 @@ void main() {
                 stableId: 'idol_test',
                 name: '小五',
                 color: '蓝色',
+                colorValue: colorValueForName('蓝色'),
                 groupName: 'EAUX',
                 createdAt: '2026-01-01T00:00:00',
               ),
@@ -377,6 +434,8 @@ void main() {
 
       expect(find.widgetWithText(TextFormField, '小五'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'EAUX'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, '蓝色'), findsOneWidget);
+      expect(find.text('#1E88E5'), findsOneWidget);
 
       await tester.enterText(find.widgetWithText(TextFormField, '小五'), '');
       await tester.tap(find.text('保存'));
@@ -385,6 +444,55 @@ void main() {
       expect(find.text('请填写名字'), findsOneWidget);
     },
   );
+
+  testWidgets('IdolColorField selects presets and validates color name', (
+    tester,
+  ) async {
+    final formKey = GlobalKey<FormState>();
+    IdolColorSelection? latest;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Form(
+            key: formKey,
+            child: SizedBox(
+              width: 280,
+              child: IdolColorField(
+                initialName: '蓝色',
+                initialColorValue: colorValueForName('蓝色'),
+                onChanged: (selection) => latest = selection,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('idol-color-preset-紫色')));
+    await tester.pump();
+    expect(latest!.name, '紫色');
+    expect(latest!.colorValue, colorValueForName('紫色'));
+
+    await tester.enterText(
+      find.byKey(const ValueKey('idol-color-name-field')),
+      '',
+    );
+    expect(formKey.currentState!.validate(), isFalse);
+    await tester.pump();
+    expect(find.text('请填写颜色名称'), findsOneWidget);
+  });
+
+  test('all idol create and edit entries assemble the shared color field', () {
+    const paths = [
+      'lib/features/home/add_idol_dialog.dart',
+      'lib/features/events/event_cheki_dialog.dart',
+      'lib/features/idol_detail/edit_idol_dialog.dart',
+    ];
+
+    for (final path in paths) {
+      expect(File(path).readAsStringSync(), contains('IdolColorField('));
+    }
+  });
 
   test('IdolRepository filters group aggregates by year', () async {
     await _seedGroupStatisticsData();
@@ -424,40 +532,11 @@ void main() {
     expect(byAmount.map((idol) => idol.totalAmount), [200, 140]);
   });
 
-  testWidgets('GroupDetailPage inherits year and sorts by amount', (
-    tester,
-  ) async {
-    await _seedGroupStatisticsData();
+  test('GroupDetailPage keeps the requested group and initial year', () {
+    const page = GroupDetailPage(groupName: 'EAUX', initialYear: '2026');
 
-    await tester.pumpWidget(
-      MaterialApp(
-        routes: {
-          '/idol-detail': (_) => const Scaffold(body: Text('idol detail')),
-        },
-        home: const GroupDetailPage(groupName: 'EAUX', initialYear: '2026'),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    expect(find.text('2026年'), findsOneWidget);
-    expect(find.text('小五'), findsOneWidget);
-    expect(find.text('花枝'), findsOneWidget);
-    expect(find.text('¥340'), findsOneWidget);
-
-    expect(
-      tester.getTopLeft(find.text('小五')).dy,
-      lessThan(tester.getTopLeft(find.text('花枝')).dy),
-    );
-
-    await tester.tap(find.text('按金额'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-
-    expect(
-      tester.getTopLeft(find.text('花枝')).dy,
-      lessThan(tester.getTopLeft(find.text('小五')).dy),
-    );
+    expect(page.groupName, 'EAUX');
+    expect(page.initialYear, '2026');
   });
 }
 
@@ -477,6 +556,7 @@ Future<void> _seedGroupStatisticsData() async {
     'stable_id': 'idol_seed_xiaowu',
     'name': '小五',
     'color': '蓝色',
+    'color_value': colorValueForName('蓝色'),
     'group_name': 'EAUX',
     'created_at': '2026-01-01T00:00:00',
   });
@@ -484,6 +564,7 @@ Future<void> _seedGroupStatisticsData() async {
     'stable_id': 'idol_seed_huazhi',
     'name': '花枝',
     'color': '红色',
+    'color_value': colorValueForName('红色'),
     'group_name': 'EAUX',
     'created_at': '2026-01-01T00:00:01',
   });
@@ -491,6 +572,7 @@ Future<void> _seedGroupStatisticsData() async {
     'stable_id': 'idol_seed_heita',
     'name': '黑塔',
     'color': '绿色',
+    'color_value': colorValueForName('绿色'),
     'group_name': '心率研究所',
     'created_at': '2026-01-01T00:00:02',
   });

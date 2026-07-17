@@ -13,6 +13,7 @@ class AddRecordDialog extends StatefulWidget {
   final int idolId;
   final String idolName;
   final String idolColor;
+  final int idolColorValue;
   final String idolGroup;
 
   const AddRecordDialog({
@@ -20,6 +21,7 @@ class AddRecordDialog extends StatefulWidget {
     required this.idolId,
     required this.idolName,
     required this.idolColor,
+    required this.idolColorValue,
     required this.idolGroup,
   });
 
@@ -156,7 +158,7 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = colorFor(widget.idolColor);
+    final borderColor = colorFromValue(widget.idolColorValue);
 
     return AlertDialog(
       title: const Text('添加切奇记录'),

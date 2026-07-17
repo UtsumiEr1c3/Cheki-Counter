@@ -10,12 +10,14 @@ class IdolDetailPage extends StatefulWidget {
   final int idolId;
   final String idolName;
   final String idolColor;
+  final int idolColorValue;
 
   const IdolDetailPage({
     super.key,
     required this.idolId,
     required this.idolName,
     required this.idolColor,
+    required this.idolColorValue,
   });
 
   @override
@@ -64,7 +66,9 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
   Widget build(BuildContext context) {
     final currentIdol = _idol;
     final idolName = currentIdol?.name ?? widget.idolName;
-    final idolColor = colorFor(currentIdol?.color ?? widget.idolColor);
+    final idolColor = colorFromValue(
+      currentIdol?.colorValue ?? widget.idolColorValue,
+    );
 
     return Scaffold(
       appBar: AppBar(

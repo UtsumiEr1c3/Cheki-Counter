@@ -62,8 +62,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
                   value: _selectedYear,
                   items: [
                     const DropdownMenuItem(value: null, child: Text('全部')),
-                    ..._years.map((y) =>
-                        DropdownMenuItem(value: y, child: Text('$y年'))),
+                    ..._years.map(
+                      (y) => DropdownMenuItem(value: y, child: Text('$y年')),
+                    ),
                   ],
                   onChanged: (v) {
                     _selectedYear = v;
@@ -117,8 +118,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                           final value = _mode == 'count'
                               ? idol.totalCount
                               : idol.totalAmount;
-                          final pct =
-                              total > 0 ? (value / total * 100) : 0.0;
+                          final pct = total > 0 ? (value / total * 100) : 0.0;
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 2),
                             child: Row(
@@ -127,7 +127,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                                   width: 12,
                                   height: 12,
                                   decoration: BoxDecoration(
-                                    color: colorFor(idol.color),
+                                    color: colorFromValue(idol.colorValue),
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -151,8 +151,10 @@ class _StatisticsPageState extends State<StatisticsPage> {
               const SizedBox(height: 24),
             ],
             // Ranking list
-            const Text('排行榜',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              '排行榜',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             ..._idols.asMap().entries.map((entry) {
               final rank = entry.key + 1;
@@ -160,18 +162,20 @@ class _StatisticsPageState extends State<StatisticsPage> {
               final value = _mode == 'count'
                   ? '${idol.totalCount} 切'
                   : '¥${idol.totalAmount}';
+              final idolColor = colorFromValue(idol.colorValue);
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: colorFor(idol.color),
-                  foregroundColor:
-                      colorFor(idol.color).computeLuminance() > 0.5
-                          ? Colors.black
-                          : Colors.white,
+                  backgroundColor: idolColor,
+                  foregroundColor: idolColor.computeLuminance() > 0.5
+                      ? Colors.black
+                      : Colors.white,
                   child: Text('$rank'),
                 ),
                 title: Text(idol.name),
-                trailing: Text(value,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                trailing: Text(
+                  value,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               );
             }),
           ],
@@ -182,12 +186,11 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
   List<PieChartSectionData> _buildPieSections(int total) {
     return _idols.map((idol) {
-      final value =
-          _mode == 'count' ? idol.totalCount : idol.totalAmount;
+      final value = _mode == 'count' ? idol.totalCount : idol.totalAmount;
       final pct = total > 0 ? (value / total * 100) : 0.0;
       return PieChartSectionData(
         value: value.toDouble(),
-        color: colorFor(idol.color),
+        color: colorFromValue(idol.colorValue),
         title: pct >= 5 ? '${pct.toStringAsFixed(1)}%' : '',
         titleStyle: const TextStyle(fontSize: 10, color: Colors.white),
         radius: 60,

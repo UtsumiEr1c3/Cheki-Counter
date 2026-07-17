@@ -16,7 +16,7 @@ class IdolCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = colorFor(idol.color);
+    final borderColor = colorFromValue(idol.colorValue);
     final isLight = borderColor.computeLuminance() > 0.7;
 
     return GestureDetector(

@@ -51,6 +51,7 @@ class EventChekiEntryService {
     required CheckiEvent event,
     required String name,
     required String color,
+    required int colorValue,
     required String groupName,
     required int count,
     required int unitPrice,
@@ -76,6 +77,7 @@ class EventChekiEntryService {
       Idol(
         name: trimmedName,
         color: color,
+        colorValue: colorValue,
         groupName: trimmedGroup,
         createdAt: nowIso,
       ),

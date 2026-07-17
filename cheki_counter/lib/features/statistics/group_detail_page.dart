@@ -132,7 +132,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   }
 
   Widget _buildIdolTile(Idol idol) {
-    final idolColor = colorFor(idol.color);
+    final idolColor = colorFromValue(idol.colorValue);
     final textColor = idolColor.computeLuminance() > 0.5
         ? Colors.black
         : Colors.white;
@@ -164,6 +164,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
             'idolId': idol.id,
             'idolName': idol.name,
             'idolColor': idol.color,
+            'idolColorValue': idol.colorValue,
           },
         );
         _loadYears();

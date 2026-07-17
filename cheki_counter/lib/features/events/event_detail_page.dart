@@ -124,7 +124,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
               final rows = entry.value;
               final first = rows.first;
               final idolName = first['idol_name'] as String;
-              final idolColor = first['idol_color'] as String;
+              final idolColorValue = first['idol_color_value'] as int;
               final groupCount = rows.fold<int>(
                 0,
                 (s, r) => s + (r['count'] as int),
@@ -140,7 +140,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
                           width: 14,
                           height: 14,
                           decoration: BoxDecoration(
-                            color: colorFor(idolColor),
+                            color: colorFromValue(idolColorValue),
                             shape: BoxShape.circle,
                           ),
                         ),

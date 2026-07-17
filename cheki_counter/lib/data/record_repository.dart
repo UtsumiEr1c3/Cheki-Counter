@@ -41,10 +41,9 @@ class RecordRepository {
 
       // Check if idol has remaining records
       final remaining = Sqflite.firstIntValue(
-        await txn.rawQuery(
-          'SELECT COUNT(*) FROM records WHERE idol_id = ?',
-          [idolId],
-        ),
+        await txn.rawQuery('SELECT COUNT(*) FROM records WHERE idol_id = ?', [
+          idolId,
+        ]),
       );
 
       if (remaining == 0) {
@@ -60,7 +59,8 @@ class RecordRepository {
   /// Joins `events` to carry the (optional) event name for UI display.
   Future<List<IdolRecordRow>> listByIdol(int idolId) async {
     final db = await _db;
-    final rows = await db.rawQuery('''
+    final rows = await db.rawQuery(
+      '''
       SELECT r.id, r.idol_id, r.date, r.count, r.unit_price, r.subtotal,
              r.venue, r.created_at, r.event_id, r.is_online,
              e.name AS event_name
@@ -68,27 +68,35 @@ class RecordRepository {
       LEFT JOIN events e ON e.id = r.event_id
       WHERE r.idol_id = ?
       ORDER BY r.date DESC, r.created_at DESC
-    ''', [idolId]);
+    ''',
+      [idolId],
+    );
     return rows
-        .map((row) => IdolRecordRow(
-              record: CheckiRecord.fromMap(row),
-              eventName: row['event_name'] as String?,
-            ))
+        .map(
+          (row) => IdolRecordRow(
+            record: CheckiRecord.fromMap(row),
+            eventName: row['event_name'] as String?,
+          ),
+        )
         .toList();
   }
 
   /// List all records for a given event, ordered by idol and created_at.
   Future<List<Map<String, dynamic>>> getByEventId(int eventId) async {
     final db = await _db;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT r.id, r.idol_id, r.date, r.count, r.unit_price, r.subtotal,
              r.venue, r.created_at, r.event_id,
-             i.name AS idol_name, i.color AS idol_color, i.group_name
+             i.name AS idol_name, i.color AS idol_color,
+             i.color_value AS idol_color_value, i.group_name
       FROM records r
       JOIN idols i ON i.id = r.idol_id
       WHERE r.event_id = ?
       ORDER BY i.name ASC, r.created_at DESC
-    ''', [eventId]);
+    ''',
+      [eventId],
+    );
   }
 
   /// Get the last unit price for a given idol (by created_at).
@@ -110,21 +118,27 @@ class RecordRepository {
   /// Get daily aggregates for an idol (for line chart).
   Future<List<Map<String, dynamic>>> dailyAggregates(int idolId) async {
     final db = await _db;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT date, SUM(count) AS total
       FROM records WHERE idol_id = ?
       GROUP BY date ORDER BY date
-    ''', [idolId]);
+    ''',
+      [idolId],
+    );
   }
 
   /// Get monthly aggregates for an idol (for line chart).
   Future<List<Map<String, dynamic>>> monthlyAggregates(int idolId) async {
     final db = await _db;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT strftime('%Y-%m', date) AS ym, SUM(count) AS total
       FROM records WHERE idol_id = ?
       GROUP BY ym ORDER BY ym
-    ''', [idolId]);
+    ''',
+      [idolId],
+    );
   }
 
   /// Get distinct years from records.
@@ -164,14 +178,17 @@ class RecordRepository {
     final trimmed = input.trim();
     if (trimmed.isEmpty) return null;
     final db = await _db;
-    final results = await db.rawQuery('''
+    final results = await db.rawQuery(
+      '''
       SELECT venue FROM (
         SELECT venue, created_at FROM records WHERE LOWER(venue) = LOWER(?)
         UNION ALL
         SELECT venue, created_at FROM events WHERE LOWER(venue) = LOWER(?)
       )
       ORDER BY created_at DESC LIMIT 1
-    ''', [trimmed, trimmed]);
+    ''',
+      [trimmed, trimmed],
+    );
     if (results.isEmpty) return null;
     return results.first['venue'] as String;
   }
@@ -190,24 +207,27 @@ class RecordRepository {
     DatabaseExecutor? executor,
   }) async {
     final db = executor ?? await _db;
-    final result = await db.rawQuery('''
+    final result = await db.rawQuery(
+      '''
       SELECT 1 FROM records
       WHERE idol_id = ? AND date = ? AND count = ?
         AND unit_price = ? AND venue = ? AND created_at = ?
         AND ((event_id IS NULL AND ? IS NULL) OR event_id = ?)
         AND is_online = ?
       LIMIT 1
-    ''', [
-      idolId,
-      date,
-      count,
-      unitPrice,
-      venue,
-      createdAt,
-      eventId,
-      eventId,
-      isOnline ? 1 : 0,
-    ]);
+    ''',
+      [
+        idolId,
+        date,
+        count,
+        unitPrice,
+        venue,
+        createdAt,
+        eventId,
+        eventId,
+        isOnline ? 1 : 0,
+      ],
+    );
     return result.isNotEmpty;
   }
 }

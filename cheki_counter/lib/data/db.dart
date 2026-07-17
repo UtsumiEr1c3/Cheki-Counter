@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
+import 'package:cheki_counter/shared/colors.dart';
 
 class DatabaseHelper {
   DatabaseHelper._();
@@ -26,7 +27,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -39,6 +40,7 @@ class DatabaseHelper {
         name TEXT NOT NULL,
         stable_id TEXT NOT NULL,
         color TEXT NOT NULL,
+        color_value INTEGER NOT NULL,
         group_name TEXT NOT NULL,
         created_at TEXT NOT NULL,
         UNIQUE (name, color, group_name)
@@ -128,6 +130,20 @@ class DatabaseHelper {
       await db.execute(
         'CREATE UNIQUE INDEX idx_idols_stable_id ON idols(stable_id)',
       );
+    }
+    if (oldVersion < 6) {
+      await db.execute(
+        'ALTER TABLE idols ADD COLUMN color_value INTEGER NOT NULL '
+        'DEFAULT $fallbackIdolColorValue',
+      );
+      for (final entry in presetColors.entries) {
+        await db.update(
+          'idols',
+          {'color_value': entry.value},
+          where: 'color = ?',
+          whereArgs: [entry.key],
+        );
+      }
     }
   }
 

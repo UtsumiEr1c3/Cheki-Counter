@@ -26,11 +26,13 @@ class EventWithSummary {
 class IdolSummaryEntry {
   final String name;
   final String color;
+  final int colorValue;
   final int count;
 
   IdolSummaryEntry({
     required this.name,
     required this.color,
+    required this.colorValue,
     required this.count,
   });
 }
@@ -136,7 +138,7 @@ class EventRepository {
     final ids = eventRows.map((r) => r['id'] as int).toList();
     final placeholders = List.filled(ids.length, '?').join(',');
     final idolRows = await db.rawQuery('''
-      SELECT r.event_id, i.name, i.color, SUM(r.count) AS cnt
+      SELECT r.event_id, i.name, i.color, i.color_value, SUM(r.count) AS cnt
       FROM records r
       JOIN idols i ON i.id = r.idol_id
       WHERE r.event_id IN ($placeholders) AND r.is_online = 0
@@ -153,6 +155,7 @@ class EventRepository {
             IdolSummaryEntry(
               name: row['name'] as String,
               color: row['color'] as String,
+              colorValue: row['color_value'] as int,
               count: (row['cnt'] as num).toInt(),
             ),
           );

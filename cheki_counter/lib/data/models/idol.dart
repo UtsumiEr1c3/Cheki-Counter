@@ -3,6 +3,7 @@ class Idol {
   final String stableId;
   final String name;
   final String color;
+  final int colorValue;
   final String groupName;
   final String createdAt;
 
@@ -15,6 +16,7 @@ class Idol {
     this.stableId = '',
     required this.name,
     required this.color,
+    required this.colorValue,
     required this.groupName,
     required this.createdAt,
     this.totalCount = 0,
@@ -27,6 +29,7 @@ class Idol {
       if (stableId.isNotEmpty) 'stable_id': stableId,
       'name': name,
       'color': color,
+      'color_value': colorValue,
       'group_name': groupName,
       'created_at': createdAt,
     };
@@ -38,6 +41,7 @@ class Idol {
       stableId: map['stable_id'] as String? ?? '',
       name: map['name'] as String,
       color: map['color'] as String,
+      colorValue: map['color_value'] as int,
       groupName: map['group_name'] as String,
       createdAt: map['created_at'] as String,
       totalCount: map['total_count'] as int? ?? 0,
@@ -50,6 +54,7 @@ class Idol {
     String? stableId,
     String? name,
     String? color,
+    int? colorValue,
     String? groupName,
     String? createdAt,
     int? totalCount,
@@ -60,6 +65,7 @@ class Idol {
       stableId: stableId ?? this.stableId,
       name: name ?? this.name,
       color: color ?? this.color,
+      colorValue: colorValue ?? this.colorValue,
       groupName: groupName ?? this.groupName,
       createdAt: createdAt ?? this.createdAt,
       totalCount: totalCount ?? this.totalCount,

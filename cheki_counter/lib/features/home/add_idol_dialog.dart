@@ -9,6 +9,7 @@ import 'package:cheki_counter/shared/colors.dart';
 import 'package:cheki_counter/shared/formatters.dart';
 import 'package:cheki_counter/shared/widgets/event_field.dart';
 import 'package:cheki_counter/shared/widgets/venue_field.dart';
+import 'package:cheki_counter/shared/widgets/idol_color_field.dart';
 
 class AddIdolDialog extends StatefulWidget {
   const AddIdolDialog({super.key});
@@ -28,6 +29,7 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
   final _ticketPriceController = TextEditingController();
   late DateTime _selectedDate;
   String _selectedColor = presetColorNames.first;
+  int _selectedColorValue = colorValueForName(presetColorNames.first);
   bool _isOnline = false;
   final _repo = IdolRepository();
   final _recordRepo = RecordRepository();
@@ -139,6 +141,7 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
     final idol = Idol(
       name: name,
       color: color,
+      colorValue: _selectedColorValue,
       groupName: group,
       createdAt: nowIso,
     );
@@ -183,12 +186,13 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
                 },
               ),
               const SizedBox(height: 12),
-              // Color picker - 4x5 grid
-              const Text('应援色', style: TextStyle(fontSize: 14)),
-              const SizedBox(height: 4),
-              _ColorGrid(
-                selected: _selectedColor,
-                onSelected: (c) => setState(() => _selectedColor = c),
+              IdolColorField(
+                initialName: _selectedColor,
+                initialColorValue: _selectedColorValue,
+                onChanged: (selection) {
+                  _selectedColor = selection.name;
+                  _selectedColorValue = selection.colorValue;
+                },
               ),
               const SizedBox(height: 12),
               // Group
@@ -322,55 +326,6 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
         ),
         FilledButton(onPressed: _submit, child: const Text('确定')),
       ],
-    );
-  }
-}
-
-class _ColorGrid extends StatelessWidget {
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  const _ColorGrid({required this.selected, required this.onSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    final names = presetColorNames;
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 5,
-        crossAxisSpacing: 6,
-        mainAxisSpacing: 6,
-      ),
-      itemCount: names.length,
-      itemBuilder: (context, index) {
-        final name = names[index];
-        final color = colorFor(name);
-        final isSelected = name == selected;
-        return GestureDetector(
-          onTap: () => onSelected(name),
-          child: Container(
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: isSelected ? Colors.black : Colors.grey[300]!,
-                width: isSelected ? 3 : 1,
-              ),
-            ),
-            child: isSelected
-                ? Icon(
-                    Icons.check,
-                    size: 16,
-                    color: color.computeLuminance() > 0.5
-                        ? Colors.black
-                        : Colors.white,
-                  )
-                : null,
-          ),
-        );
-      },
     );
   }
 }

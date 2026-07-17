@@ -95,7 +95,7 @@ class _IdolChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = colorFor(entry.color);
+    final color = colorFromValue(entry.colorValue);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
