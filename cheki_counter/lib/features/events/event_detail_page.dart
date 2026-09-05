@@ -3,6 +3,7 @@ import 'package:cheki_counter/data/event_repository.dart';
 import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/data/models/event.dart';
 import 'package:cheki_counter/features/events/event_cheki_dialog.dart';
+import 'package:cheki_counter/features/events/edit_event_dialog.dart';
 import 'package:cheki_counter/shared/colors.dart';
 
 class EventDetailPage extends StatefulWidget {
@@ -49,6 +50,14 @@ class _EventDetailPageState extends State<EventDetailPage> {
     }
   }
 
+  Future<void> _editEvent(CheckiEvent event) async {
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => EditEventDialog(event: event),
+    );
+    if (changed == true && mounted) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -76,7 +85,16 @@ class _EventDetailPageState extends State<EventDetailPage> {
     final grandAmount = event.ticketPrice + totalAmount;
 
     return Scaffold(
-      appBar: AppBar(title: Text(event.name)),
+      appBar: AppBar(
+        title: Text(event.name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: '编辑活动',
+            onPressed: () => _editEvent(event),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openAddCheki(event),
         icon: const Icon(Icons.add),
@@ -100,6 +118,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
                 ),
                 const SizedBox(height: 4),
                 Text('${event.date} · ${event.venue}'),
+                Text(event.isOnline ? '仅电切' : '现场参加'),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 12,

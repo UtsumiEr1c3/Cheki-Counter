@@ -41,10 +41,12 @@ class CsvService {
     '电切',
     '门票价格',
     '应援色值',
+    '活动ID',
+    '活动方式',
   ];
 
   /// Import CSV from file bytes. Merge-append semantics.
-  /// Accepts legacy 9/11/12/13/14-column formats and the 15-column format.
+  /// Accepts legacy formats and the current header-based extended format.
   Future<ImportResult> importCsv(List<int> bytes) async {
     final result = ImportResult();
 
@@ -67,6 +69,8 @@ class CsvService {
     final header = rows.first.map((e) => e.toString().trim()).toList();
     final hasStableIdColumn = header.isNotEmpty && header.first == '偶像ID';
     final colorValueIndex = header.indexOf('应援色值');
+    final eventStableIdIndex = header.indexOf('活动ID');
+    final eventModeIndex = header.indexOf('活动方式');
     final offset = hasStableIdColumn ? 1 : 0;
     if (header.length < 9 + offset) {
       result.errors = 1;
@@ -143,6 +147,15 @@ class CsvService {
             venue.isNotEmpty &&
             countVal.toString().trim().isNotEmpty &&
             priceVal.toString().trim().isNotEmpty;
+        final eventStableId = eventStableIdIndex >= 0
+            ? col(eventStableIdIndex)
+            : '';
+        final rawEventMode = eventModeIndex >= 0 ? col(eventModeIndex) : '';
+        final eventIsOnline = rawEventMode == '电切' || rawEventMode == '1'
+            ? true
+            : rawEventMode == '现场' || rawEventMode == '0'
+            ? false
+            : hasRecord && isOnline;
 
         var colorValue = colorValueForName(color);
         if (hasRecord && colorValueIndex >= 0) {
@@ -170,19 +183,26 @@ class CsvService {
         }
 
         if (hasEvent) {
-          final existingEvent = await _findEventId(
-            eventName,
-            eventVenue,
-            eventDate,
-          );
-          eventId = await _eventRepo.upsertByTriple(
-            eventName,
-            eventVenue,
-            eventDate,
-            createdAt.isNotEmpty ? createdAt : DateTime.now().toIso8601String(),
-            ticketPrice: ticketPrice,
-          );
-          if (existingEvent == null) {
+          final stableEvent = eventStableId.isEmpty
+              ? null
+              : await _eventRepo.getByStableId(eventStableId);
+          final existingEventId =
+              stableEvent?.id ??
+              await _findEventId(eventName, eventVenue, eventDate);
+          eventId =
+              stableEvent?.id ??
+              await _eventRepo.upsertByTriple(
+                eventName,
+                eventVenue,
+                eventDate,
+                createdAt.isNotEmpty
+                    ? createdAt
+                    : DateTime.now().toIso8601String(),
+                ticketPrice: ticketPrice,
+                isOnline: eventIsOnline,
+                stableId: eventStableId.isEmpty ? null : eventStableId,
+              );
+          if (existingEventId == null) {
             result.newEvents++;
           }
         }
@@ -305,7 +325,8 @@ class CsvService {
              r.venue AS r_venue, r.created_at AS r_created,
              r.is_online AS r_is_online,
              e.name AS e_name, e.venue AS e_venue, e.date AS e_date,
-             e.ticket_price AS e_ticket_price,
+             e.ticket_price AS e_ticket_price, e.stable_id AS e_stable_id,
+             e.is_online AS e_is_online,
              COALESCE(e.date, r.date) AS sort_date, r.id AS r_id
       FROM records r
       JOIN idols i ON i.id = r.idol_id
@@ -315,7 +336,8 @@ class CsvService {
 
     final pureEventRows = await db.rawQuery('''
       SELECT e.name AS e_name, e.venue AS e_venue, e.date AS e_date,
-             e.created_at AS e_created, e.ticket_price AS e_ticket_price
+             e.created_at AS e_created, e.ticket_price AS e_ticket_price,
+             e.stable_id AS e_stable_id, e.is_online AS e_is_online
       FROM events e
       WHERE NOT EXISTS (
         SELECT 1 FROM records r WHERE r.event_id = e.id
@@ -365,6 +387,10 @@ class CsvService {
                 ? ''
                 : ((d['e_ticket_price'] as int?) ?? 0).toString(),
             colorValueToHex(d['idol_color_value'] as int),
+            d['e_stable_id'] ?? '',
+            d['e_name'] == null
+                ? ''
+                : ((d['e_is_online'] as int?) == 1 ? '电切' : '现场'),
           ];
         } else {
           return [
@@ -384,6 +410,8 @@ class CsvService {
             '0',
             ((d['e_ticket_price'] as int?) ?? 0).toString(),
             '',
+            d['e_stable_id'] ?? '',
+            (d['e_is_online'] as int?) == 1 ? '电切' : '现场',
           ];
         }
       }),

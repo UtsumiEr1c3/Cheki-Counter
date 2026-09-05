@@ -21,7 +21,7 @@ class EventCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${event.date} · ${event.venue}',
+                '${event.date} · ${event.venue}${event.isOnline ? ' · 仅电切' : ''}',
                 style: TextStyle(color: Colors.grey[600], fontSize: 12),
               ),
               const SizedBox(height: 4),

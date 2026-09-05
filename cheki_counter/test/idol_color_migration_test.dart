@@ -36,6 +36,16 @@ void main() {
           )
         ''');
         await db.execute('''
+          CREATE TABLE events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            venue TEXT NOT NULL,
+            date TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            ticket_price INTEGER NOT NULL DEFAULT 0
+          )
+        ''');
+        await db.execute('''
           CREATE TABLE records (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             idol_id INTEGER NOT NULL,

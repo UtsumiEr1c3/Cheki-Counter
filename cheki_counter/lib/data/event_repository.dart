@@ -37,6 +37,26 @@ class IdolSummaryEntry {
   });
 }
 
+class EventSpendingSummary {
+  final int allChekiAmount;
+  final int onsiteChekiAmount;
+  final int onlineChekiAmount;
+  final int onsiteTicketAmount;
+  final int onsiteEventCount;
+
+  const EventSpendingSummary({
+    required this.allChekiAmount,
+    required this.onsiteChekiAmount,
+    required this.onlineChekiAmount,
+    required this.onsiteTicketAmount,
+    required this.onsiteEventCount,
+  });
+
+  int get totalSpending => allChekiAmount + onsiteTicketAmount;
+}
+
+class EventAlreadyExistsException implements Exception {}
+
 class EventRepository {
   Future<Database> get _db => DatabaseHelper.instance.database;
 
@@ -46,6 +66,8 @@ class EventRepository {
     String date,
     String createdAt, {
     int ticketPrice = 0,
+    bool isOnline = false,
+    String? stableId,
     DatabaseExecutor? executor,
   }) async {
     final db = executor ?? await _db;
@@ -71,11 +93,72 @@ class EventRepository {
       return id;
     }
     return await db.insert('events', {
+      'stable_id': stableId?.trim().isNotEmpty == true
+          ? stableId!.trim()
+          : generateEventStableId(),
       'name': name,
       'venue': venue,
       'date': date,
       'created_at': createdAt,
       'ticket_price': ticketPrice,
+      'is_online': isOnline ? 1 : 0,
+    });
+  }
+
+  Future<CheckiEvent?> getByStableId(String stableId) async {
+    final db = await _db;
+    final rows = await db.query(
+      'events',
+      where: 'stable_id = ?',
+      whereArgs: [stableId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return CheckiEvent.fromMap(rows.first);
+  }
+
+  Future<void> update(CheckiEvent original, CheckiEvent updated) async {
+    final id = original.id;
+    if (id == null) throw ArgumentError('活动 ID 不能为空');
+    final db = await _db;
+    await db.transaction((txn) async {
+      final duplicate = await txn.query(
+        'events',
+        columns: ['id'],
+        where: 'name = ? AND venue = ? AND date = ? AND id != ?',
+        whereArgs: [updated.name, updated.venue, updated.date, id],
+        limit: 1,
+      );
+      if (duplicate.isNotEmpty) throw EventAlreadyExistsException();
+
+      await txn.update(
+        'events',
+        {
+          'name': updated.name,
+          'venue': updated.venue,
+          'date': updated.date,
+          'ticket_price': updated.ticketPrice,
+          'is_online': updated.isOnline ? 1 : 0,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      if (original.date != updated.date) {
+        await txn.update(
+          'records',
+          {'date': updated.date},
+          where: 'event_id = ? AND date = ?',
+          whereArgs: [id, original.date],
+        );
+      }
+      if (original.venue != updated.venue) {
+        await txn.update(
+          'records',
+          {'venue': updated.venue},
+          where: 'event_id = ? AND venue = ?',
+          whereArgs: [id, original.venue],
+        );
+      }
     });
   }
 
@@ -105,20 +188,77 @@ class EventRepository {
     return rows.map((r) => r['year'] as String).toList();
   }
 
+  Future<List<String>> getSpendingYears() async {
+    final db = await _db;
+    final rows = await db.rawQuery('''
+      SELECT year FROM (
+        SELECT strftime('%Y', date) AS year FROM events
+        UNION
+        SELECT strftime('%Y', date) AS year FROM records
+      )
+      WHERE year IS NOT NULL
+      ORDER BY year DESC
+    ''');
+    return rows.map((r) => r['year'] as String).toList();
+  }
+
+  Future<EventSpendingSummary> getSpendingSummary({String? year}) async {
+    final db = await _db;
+    final recordWhere = year == null ? '' : "WHERE strftime('%Y', date) = ?";
+    final recordArgs = year == null ? <Object?>[] : <Object?>[year];
+    final recordRows = await db.rawQuery('''
+      SELECT COALESCE(SUM(subtotal), 0) AS all_cheki,
+             COALESCE(SUM(CASE WHEN is_online = 0 THEN subtotal ELSE 0 END), 0)
+               AS onsite_cheki,
+             COALESCE(SUM(CASE WHEN is_online = 1 THEN subtotal ELSE 0 END), 0)
+               AS online_cheki
+      FROM records
+      $recordWhere
+    ''', recordArgs);
+
+    final eventConditions = <String>['is_online = 0'];
+    final eventArgs = <Object?>[];
+    if (year != null) {
+      eventConditions.add("strftime('%Y', date) = ?");
+      eventArgs.add(year);
+    }
+    final eventRows = await db.rawQuery('''
+      SELECT COALESCE(SUM(ticket_price), 0) AS onsite_tickets,
+             COUNT(*) AS onsite_events
+      FROM events
+      WHERE ${eventConditions.join(' AND ')}
+    ''', eventArgs);
+
+    final record = recordRows.single;
+    final event = eventRows.single;
+    return EventSpendingSummary(
+      allChekiAmount: (record['all_cheki'] as num).toInt(),
+      onsiteChekiAmount: (record['onsite_cheki'] as num).toInt(),
+      onlineChekiAmount: (record['online_cheki'] as num).toInt(),
+      onsiteTicketAmount: (event['onsite_tickets'] as num).toInt(),
+      onsiteEventCount: (event['onsite_events'] as num).toInt(),
+    );
+  }
+
   Future<List<EventWithSummary>> getAllWithRecordsSummary({
     String? year,
+    bool? isOnline = false,
   }) async {
     final db = await _db;
 
-    final conditions = <String>[
-      "NOT EXISTS (SELECT 1 FROM records WHERE event_id = e.id AND is_online = 1)",
-    ];
+    final conditions = <String>[];
     final args = <Object?>[];
+    if (isOnline != null) {
+      conditions.add('e.is_online = ?');
+      args.add(isOnline ? 1 : 0);
+    }
     if (year != null) {
       conditions.add("strftime('%Y', e.date) = ?");
       args.add(year);
     }
-    final whereClause = 'WHERE ${conditions.join(' AND ')}';
+    final whereClause = conditions.isEmpty
+        ? ''
+        : 'WHERE ${conditions.join(' AND ')}';
 
     final eventRows = await db.rawQuery('''
       SELECT e.id, e.name, e.venue, e.date, e.created_at,
@@ -127,7 +267,7 @@ class EventRepository {
              COALESCE(SUM(r.subtotal), 0) AS total_amount,
              COUNT(r.id) AS record_count
       FROM events e
-      LEFT JOIN records r ON r.event_id = e.id AND r.is_online = 0
+      LEFT JOIN records r ON r.event_id = e.id AND r.is_online = e.is_online
       $whereClause
       GROUP BY e.id
       ORDER BY e.date DESC, e.id DESC
@@ -141,7 +281,8 @@ class EventRepository {
       SELECT r.event_id, i.name, i.color, i.color_value, SUM(r.count) AS cnt
       FROM records r
       JOIN idols i ON i.id = r.idol_id
-      WHERE r.event_id IN ($placeholders) AND r.is_online = 0
+      JOIN events e ON e.id = r.event_id
+      WHERE r.event_id IN ($placeholders) AND r.is_online = e.is_online
       GROUP BY r.event_id, i.id
       ORDER BY cnt DESC, i.name ASC
     ''', ids);

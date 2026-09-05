@@ -271,8 +271,9 @@ void main() {
     final exportedBytes = await File(exportPath).readAsBytes();
     final exportedText = utf8.decode(exportedBytes.skip(3).toList());
     final exportedLines = exportedText.replaceAll('\r\n', '\n').split('\n');
-    expect(exportedLines.first, endsWith(',应援色值'));
-    expect(exportedLines[1], endsWith(',#1E88E5'));
+    expect(exportedLines.first, endsWith(',应援色值,活动ID,活动方式'));
+    expect(exportedLines[1], contains(',#1E88E5,event_'));
+    expect(exportedLines[1], endsWith(',现场'));
     final result = await service.importCsv(exportedBytes);
     final db = await DatabaseHelper.instance.database;
     final events = await db.query('events');

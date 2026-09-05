@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'package:cheki_counter/shared/colors.dart';
+import 'package:cheki_counter/data/models/event.dart';
 
 class DatabaseHelper {
   DatabaseHelper._();
@@ -27,7 +28,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -54,13 +55,18 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        stable_id TEXT NOT NULL,
         name TEXT NOT NULL,
         venue TEXT NOT NULL,
         date TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        ticket_price INTEGER NOT NULL DEFAULT 0
+        ticket_price INTEGER NOT NULL DEFAULT 0,
+        is_online INTEGER NOT NULL DEFAULT 0
       )
     ''');
+    await db.execute(
+      'CREATE UNIQUE INDEX idx_events_stable_id ON events(stable_id)',
+    );
 
     await db.execute(
       'CREATE UNIQUE INDEX idx_events_triple ON events(name, venue, date)',
@@ -144,6 +150,35 @@ class DatabaseHelper {
           whereArgs: [entry.key],
         );
       }
+    }
+    if (oldVersion < 7) {
+      await db.execute('ALTER TABLE events ADD COLUMN stable_id TEXT');
+      final events = await db.query('events', columns: ['id']);
+      for (final event in events) {
+        await db.update(
+          'events',
+          {'stable_id': generateEventStableId()},
+          where: 'id = ?',
+          whereArgs: [event['id']],
+        );
+      }
+      await db.execute(
+        'CREATE UNIQUE INDEX idx_events_stable_id ON events(stable_id)',
+      );
+      await db.execute(
+        'ALTER TABLE events ADD COLUMN is_online INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.execute('''
+        UPDATE events SET is_online = 1
+        WHERE EXISTS (
+          SELECT 1 FROM records r
+          WHERE r.event_id = events.id AND r.is_online = 1
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM records r
+          WHERE r.event_id = events.id AND r.is_online = 0
+        )
+      ''');
     }
   }
 

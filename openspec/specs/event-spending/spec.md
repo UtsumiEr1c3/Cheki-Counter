@@ -1,0 +1,25 @@
+# event-spending Specification
+
+## Purpose
+TBD - created by archiving change add-event-participation-and-spending. Update Purpose after archive.
+## Requirements
+### Requirement: 活动页支出面板
+
+系统 SHALL 在偶活总览提供“活动”和“支出”两个页签。支出页 SHALL 展示全部切奇费用、现场切费用、电切费用、现场活动门票、现场参加场数和累计支出；累计支出 MUST 等于全部切奇费用加现场活动门票。
+
+#### Scenario: 汇总全部支出
+- **WHEN** 现场切记录合计 ¥300、电切记录合计 ¥200，现场参加活动门票合计 ¥150，另有仅电切活动门票 ¥80
+- **THEN** 支出页显示全部切奇 ¥500、现场切 ¥300、电切 ¥200、现场门票 ¥150、累计支出 ¥650，且仅电切活动门票不计入累计支出
+
+#### Scenario: 无活动记录仍计入切奇费用
+- **WHEN** 一条 ¥100 的电切记录没有关联活动
+- **THEN** 全部切奇和电切费用均增加 ¥100
+
+### Requirement: 支出年份筛选
+
+支出页 SHALL 与活动页共享年份筛选。切奇费用 SHALL 按 `records.date` 归属年份，门票和参加场数 SHALL 按 `events.date` 归属年份。
+
+#### Scenario: 按年份计算不同数据源
+- **WHEN** 用户选择 2026 年
+- **THEN** 切奇统计只包含 2026 年记录，门票和参加场数只包含 2026 年现场活动
+

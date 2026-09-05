@@ -31,6 +31,7 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
   String _selectedColor = presetColorNames.first;
   int _selectedColorValue = colorValueForName(presetColorNames.first);
   bool _isOnline = false;
+  CheckiEvent? _selectedEvent;
   final _repo = IdolRepository();
   final _recordRepo = RecordRepository();
   final _eventRepo = EventRepository();
@@ -57,9 +58,9 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
   void _onEventSelected(CheckiEvent? e) {
     if (e == null) return;
     setState(() {
-      if (!_isOnline) {
-        _venueController.text = e.venue;
-      }
+      _selectedEvent = e;
+      _isOnline = e.isOnline;
+      _venueController.text = e.isOnline ? '电切' : e.venue;
       try {
         _selectedDate = DateTime.parse(e.date);
       } catch (_) {}
@@ -129,13 +130,22 @@ class _AddIdolDialogState extends State<AddIdolDialog> {
         : int.parse(_ticketPriceController.text.trim());
     int? eventId;
     if (eventName.isNotEmpty) {
-      eventId = await _eventRepo.upsertByTriple(
-        eventName,
-        canonicalVenue,
-        dateStr,
-        nowIso,
-        ticketPrice: ticketPrice,
-      );
+      final selected = _selectedEvent;
+      final canReuseSelected =
+          selected?.id != null &&
+          selected!.name == eventName &&
+          selected.date == dateStr &&
+          (_isOnline || selected.venue == canonicalVenue);
+      eventId = canReuseSelected
+          ? selected.id
+          : await _eventRepo.upsertByTriple(
+              eventName,
+              canonicalVenue,
+              dateStr,
+              nowIso,
+              ticketPrice: ticketPrice,
+              isOnline: _isOnline,
+            );
     }
 
     final idol = Idol(

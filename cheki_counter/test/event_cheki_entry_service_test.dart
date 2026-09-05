@@ -92,11 +92,13 @@ void main() {
     );
     final event = CheckiEvent(
       id: await db.insert('events', {
+        'stable_id': 'event_existing_idol',
         'name': 'VoltFes',
         'venue': 'Wuhan MAO',
         'date': '2026-04-20',
         'created_at': '2026-04-01T00:00:00',
         'ticket_price': 180,
+        'is_online': 0,
       }),
       name: 'VoltFes',
       venue: 'Wuhan MAO',
@@ -142,11 +144,13 @@ void main() {
       final db = await DatabaseHelper.instance.database;
       final event = CheckiEvent(
         id: await db.insert('events', {
+          'stable_id': 'event_new_idol',
           'name': 'VoltFes',
           'venue': 'Wuhan MAO',
           'date': '2026-04-20',
           'created_at': '2026-04-01T00:00:00',
           'ticket_price': 180,
+          'is_online': 0,
         }),
         name: 'VoltFes',
         venue: 'Wuhan MAO',
@@ -201,11 +205,13 @@ void main() {
       final db = await DatabaseHelper.instance.database;
       final event = CheckiEvent(
         id: await db.insert('events', {
+          'stable_id': 'event_duplicate_idol',
           'name': 'VoltFes',
           'venue': 'Wuhan MAO',
           'date': '2026-04-20',
           'created_at': '2026-04-01T00:00:00',
           'ticket_price': 180,
+          'is_online': 0,
         }),
         name: 'VoltFes',
         venue: 'Wuhan MAO',

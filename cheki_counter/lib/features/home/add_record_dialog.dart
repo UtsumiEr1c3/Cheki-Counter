@@ -38,6 +38,7 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
   final _ticketPriceController = TextEditingController();
   late DateTime _selectedDate;
   bool _isOnline = false;
+  CheckiEvent? _selectedEvent;
   final _repo = RecordRepository();
   final _eventRepo = EventRepository();
 
@@ -78,9 +79,9 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
   void _onEventSelected(CheckiEvent? e) {
     if (e == null) return;
     setState(() {
-      if (!_isOnline) {
-        _venueController.text = e.venue;
-      }
+      _selectedEvent = e;
+      _isOnline = e.isOnline;
+      _venueController.text = e.isOnline ? '电切' : e.venue;
       try {
         _selectedDate = DateTime.parse(e.date);
       } catch (_) {}
@@ -128,14 +129,23 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
     await db.transaction((txn) async {
       int? eventId;
       if (eventName.isNotEmpty) {
-        eventId = await _eventRepo.upsertByTriple(
-          eventName,
-          canonicalVenue,
-          dateStr,
-          nowIso,
-          ticketPrice: ticketPrice,
-          executor: txn,
-        );
+        final selected = _selectedEvent;
+        final canReuseSelected =
+            selected?.id != null &&
+            selected!.name == eventName &&
+            selected.date == dateStr &&
+            (_isOnline || selected.venue == canonicalVenue);
+        eventId = canReuseSelected
+            ? selected.id
+            : await _eventRepo.upsertByTriple(
+                eventName,
+                canonicalVenue,
+                dateStr,
+                nowIso,
+                ticketPrice: ticketPrice,
+                isOnline: _isOnline,
+                executor: txn,
+              );
       }
 
       final record = CheckiRecord(

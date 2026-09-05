@@ -42,7 +42,7 @@ class EventChekiEntryService {
         venue: event.venue,
         createdAt: createdAt ?? DateTime.now().toIso8601String(),
         eventId: event.id,
-        isOnline: false,
+        isOnline: event.isOnline,
       ),
     );
   }
@@ -90,7 +90,7 @@ class EventChekiEntryService {
         venue: event.venue,
         createdAt: nowIso,
         eventId: event.id,
-        isOnline: false,
+        isOnline: event.isOnline,
       ),
     );
   }

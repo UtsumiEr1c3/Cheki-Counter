@@ -17,6 +17,7 @@ class _AddEventDialogState extends State<AddEventDialog> {
   final _venueController = TextEditingController();
   final _ticketPriceController = TextEditingController();
   late DateTime _selectedDate;
+  bool _isOnline = false;
   final _eventRepo = EventRepository();
   final _recordRepo = RecordRepository();
 
@@ -65,6 +66,7 @@ class _AddEventDialogState extends State<AddEventDialog> {
       date,
       now,
       ticketPrice: ticketPrice,
+      isOnline: _isOnline,
     );
     if (mounted) Navigator.of(context).pop(true);
   }
@@ -125,6 +127,15 @@ class _AddEventDialogState extends State<AddEventDialog> {
                   if (n == null || n < 0) return '请输入非负整数';
                   return null;
                 },
+              ),
+              const SizedBox(height: 4),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('仅电切活动'),
+                subtitle: const Text('不计入现场参加场数和门票支出'),
+                value: _isOnline,
+                onChanged: (value) => setState(() => _isOnline = value),
               ),
             ],
           ),
