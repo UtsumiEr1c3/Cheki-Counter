@@ -482,6 +482,74 @@ void main() {
     expect(find.text('请填写颜色名称'), findsOneWidget);
   });
 
+  testWidgets('IdolColorField accepts a hex color from the picker', (
+    tester,
+  ) async {
+    IdolColorSelection? latest;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: IdolColorField(
+            initialName: '蓝色',
+            initialColorValue: colorValueForName('蓝色'),
+            onChanged: (selection) => latest = selection,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('idol-color-custom-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hex'), findsOneWidget);
+    final hexInput = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(TextField),
+    );
+    expect(hexInput, findsOneWidget);
+
+    await tester.enterText(hexInput, '#3478F6');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, '确定'));
+    await tester.pumpAndSettle();
+
+    expect(latest, isNotNull);
+    expect(latest!.colorValue, 0xFF3478F6);
+    expect(find.text('#3478F6'), findsOneWidget);
+  });
+
+  testWidgets('IdolColorField discards a hex color when picker is cancelled', (
+    tester,
+  ) async {
+    IdolColorSelection? latest;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: IdolColorField(
+            initialName: '蓝色',
+            initialColorValue: colorValueForName('蓝色'),
+            onChanged: (selection) => latest = selection,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('idol-color-custom-button')));
+    await tester.pumpAndSettle();
+
+    final hexInput = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(hexInput, '#3478F6');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(TextButton, '取消'));
+    await tester.pumpAndSettle();
+
+    expect(latest, isNull);
+    expect(find.text('#1E88E5'), findsOneWidget);
+  });
+
   test('all idol create and edit entries assemble the shared color field', () {
     const paths = [
       'lib/features/home/add_idol_dialog.dart',

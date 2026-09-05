@@ -5,7 +5,7 @@ TBD - created by archiving change add-idol-editing. Update Purpose after archive
 ## Requirements
 ### Requirement: 编辑已有偶像当前资料
 
-系统 SHALL 提供编辑已有偶像当前资料的入口，允许用户修改偶像名字、应援色名称、实际色值和团体。表单 SHALL 准确回显当前颜色名称与实际色值，并提供与创建偶像相同的预设色和调色盘选择能力。提交成功后，系统 MUST 更新同一条 `idols` 行，保留该偶像的 `id`、`stable_id`、`created_at` 和所有既有 `records.idol_id` 引用。
+系统 SHALL 提供编辑已有偶像当前资料的入口，允许用户修改偶像名字、应援色名称、实际色值和团体。表单 SHALL 准确回显当前颜色名称与实际色值，并提供与创建偶像相同的预设色、调色盘和调色盘内 Hex 输入栏选择能力。用户在 Hex 输入栏中输入 `#RRGGBB` 十六进制 RGB 色值并确认后，系统 MUST 将其规范为不透明 ARGB 色值。提交成功后，系统 MUST 更新同一条 `idols` 行，保留该偶像的 `id`、`stable_id`、`created_at` 和所有既有 `records.idol_id` 引用。
 
 #### Scenario: 编辑偶像成功
 
@@ -16,6 +16,11 @@ TBD - created by archiving change add-idol-editing. Update Purpose after archive
 
 - **WHEN** 某偶像已有 3 条切奇记录、总切数为 5，用户将应援色改为名称 `星空蓝` 和实际色值 `#3478F6` 后返回主界面
 - **THEN** 主界面 SHALL 仍显示该偶像总切数为 5，卡片边框使用 `#3478F6` 渲染
+
+#### Scenario: 通过 Hex 输入栏编辑自定义颜色
+
+- **WHEN** 用户编辑已有偶像，在自定义应援色调色盘的 Hex 输入栏输入 `#3478F6`、点击“确定”并保存
+- **THEN** 系统 SHALL 更新该偶像的实际色值为与 `#3478F6` 对应的不透明 ARGB，且调色盘选择状态 SHALL 与输入色值同步
 
 #### Scenario: 打开编辑表单准确回显自定义颜色
 

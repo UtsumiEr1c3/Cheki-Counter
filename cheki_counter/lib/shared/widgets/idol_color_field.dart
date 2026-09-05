@@ -71,6 +71,7 @@ class _IdolColorFieldState extends State<IdolColorField> {
             paletteType: PaletteType.hsvWithHue,
             labelTypes: const [],
             pickerAreaHeightPercent: 0.8,
+            hexInputBar: true,
           ),
         ),
         actions: [
