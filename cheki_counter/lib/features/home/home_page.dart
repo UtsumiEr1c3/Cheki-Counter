@@ -24,6 +24,15 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<IdolListNotifier>();
+    final textScaler = MediaQuery.textScalerOf(context);
+    final titleHeight = textScaler.scale(16) * 1.2 * 2;
+    final statisticsHeight = textScaler.scale(14) * 1.2 * 2 + 4;
+    final cardHeight =
+        8 +
+        24 +
+        titleHeight +
+        8 +
+        statisticsHeight.clamp(48.0, double.infinity).toDouble();
 
     return Scaffold(
       appBar: AppBar(
@@ -100,13 +109,12 @@ class _HomePageState extends State<HomePage> {
                 ? const Center(child: Text('暂无数据,点击右下角 + 新建偶像'))
                 : GridView.builder(
                     padding: const EdgeInsets.all(8),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          childAspectRatio: 0.9,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                        ),
+                    gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 240,
+                      mainAxisExtent: cardHeight,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
                     itemCount: notifier.idols.length,
                     itemBuilder: (context, index) {
                       final idol = notifier.idols[index];

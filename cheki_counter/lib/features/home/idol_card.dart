@@ -31,41 +31,66 @@ class IdolCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
+              Expanded(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Tooltip(
+                    message: idol.name,
                     child: Text(
                       idol.name,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        height: 1.2,
                       ),
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      iconSize: 20,
-                      onPressed: onAddRecord,
-                      icon: Icon(
-                        Icons.add_circle,
-                        color: isLight ? Colors.grey[700] : borderColor,
-                      ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${idol.totalCount} 切',
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.2,
+                            color: Colors.grey[700],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '¥${idol.totalAmount}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.2,
+                            color: Colors.grey[700],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '添加记录',
+                    onPressed: onAddRecord,
+                    icon: Icon(
+                      Icons.add_circle,
+                      color: isLight ? Colors.grey[700] : borderColor,
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${idol.totalCount} 切',
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-              Text(
-                '¥${idol.totalAmount}',
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
               ),
             ],
           ),
