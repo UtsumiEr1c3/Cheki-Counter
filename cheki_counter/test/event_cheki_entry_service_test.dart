@@ -195,7 +195,7 @@ void main() {
     );
     await service.addGroupRecord(
       event: event,
-      groupName: 'EAUX',
+      groupNames: ['EAUX'],
       groupMembers: 'Aki、Rin',
       count: 1,
       unitPrice: 0,
@@ -252,7 +252,7 @@ void main() {
 
     await EventChekiEntryService().addGroupRecord(
       event: event,
-      groupName: 'EAUX',
+      groupNames: ['EAUX', 'Other'],
       groupMembers: 'Aki、Rin',
       count: 2,
       unitPrice: 80,
@@ -263,19 +263,34 @@ void main() {
       'records',
       where: "record_type = 'group'",
     );
+    final recordGroups = await db.query('record_groups', orderBy: 'position');
     final idol = await idolRepo.findById(idolId);
     final groups = await idolRepo.getGroupAggregates();
     final eventRows = await RecordRepository().getByEventId(event.id!);
+    final suggestedMembers = await idolRepo.getSuggestedMemberNamesByGroup(
+      'EAUX',
+    );
 
     expect(groupRecords.single['idol_id'], isNull);
     expect(groupRecords.single['event_id'], event.id);
     expect(groupRecords.single['group_name'], 'EAUX');
     expect(groupRecords.single['group_members'], 'Aki、Rin');
+    expect(recordGroups.map((row) => row['group_name']), ['EAUX', 'Other']);
+    expect(recordGroups.map((row) => row['position']), [0, 1]);
     expect(idol!.totalCount, 0);
-    expect(groups.single['total_count'], 3);
-    expect(groups.single['total_amount'], 220);
+    final eaux = groups.singleWhere((row) => row['group_name'] == 'EAUX');
+    final other = groups.singleWhere((row) => row['group_name'] == 'Other');
+    expect(eaux['total_count'], 3);
+    expect(eaux['total_amount'], 220);
+    expect(other['total_count'], 2);
+    expect(other['total_amount'], 160);
     expect(eventRows, hasLength(1));
     expect(eventRows.single['record_type'], 'group');
+    expect(
+      eventRows.single['group_names'],
+      'EAUX${RecordRepository.groupNamesSeparator}Other',
+    );
+    expect(suggestedMembers, ['Aki', 'Rin']);
   });
 
   test('团切可使用新团体并保存成员快照', () async {
@@ -299,7 +314,7 @@ void main() {
 
     await EventChekiEntryService().addGroupRecord(
       event: event,
-      groupName: '新团体',
+      groupNames: ['新团体'],
       groupMembers: ' 小桃, 小凛、小桃 ',
       count: 1,
       unitPrice: 200,

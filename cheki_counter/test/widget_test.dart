@@ -274,9 +274,12 @@ void main() {
     final exportedBytes = await File(exportPath).readAsBytes();
     final exportedText = utf8.decode(exportedBytes.skip(3).toList());
     final exportedLines = exportedText.replaceAll('\r\n', '\n').split('\n');
-    expect(exportedLines.first, endsWith(',应援色值,活动ID,活动方式,切奇类型,切奇名称,团切成员'));
+    expect(
+      exportedLines.first,
+      endsWith(',应援色值,活动ID,活动方式,切奇类型,切奇名称,团切成员,团切团体'),
+    );
     expect(exportedLines[1], contains(',#1E88E5,event_'));
-    expect(exportedLines[1], endsWith(',现场,普通切,,'));
+    expect(exportedLines[1], endsWith(',现场,普通切,,,'));
     final result = await service.importCsv(exportedBytes);
     final db = await DatabaseHelper.instance.database;
     final events = await db.query('events');
@@ -290,7 +293,7 @@ void main() {
     expect(records, hasLength(1));
   });
 
-  test('CSV 可往返导入主题切和团切', () async {
+  test('CSV 可往返导入主题切和联合团切', () async {
     final tempDir = Directory.systemTemp.createTempSync('cheki_csv_types_');
     final previousPathProvider = PathProviderPlatform.instance;
     PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
@@ -299,11 +302,11 @@ void main() {
       tempDir.deleteSync(recursive: true);
     });
     const header =
-        '偶像ID,偶像名,应援色,团体,日期,数量,单价,小计,场地,创建时间,活动名,活动场地,活动日期,电切,门票价格,应援色值,活动ID,活动方式,切奇类型,切奇名称,团切成员';
+        '偶像ID,偶像名,应援色,团体,日期,数量,单价,小计,场地,创建时间,活动名,活动场地,活动日期,电切,门票价格,应援色值,活动ID,活动方式,切奇类型,切奇名称,团切成员,团切团体';
     const themeRow =
-        'idol_theme,凛,星空蓝,EAUX,2026-01-02,1,80,80.00,新年主题,2026-01-02T00:00:00,,,,0,,#3478F6,,,主题切,新年和服,';
+        'idol_theme,凛,星空蓝,EAUX,2026-01-02,1,80,80.00,新年主题,2026-01-02T00:00:00,,,,0,,#3478F6,,,主题切,新年和服,,';
     const groupRow =
-        ',,,EAUX,2026-01-03,1,200,200.00,武汉MAO,2026-01-03T00:00:00,新年公演,武汉MAO,2026-01-03,0,180,,event_group,现场,团切,,凛、桃';
+        ',,,EAUX,2026-01-03,1,200,200.00,武汉MAO,2026-01-03T00:00:00,新年公演,武汉MAO,2026-01-03,0,180,,event_group,现场,团切,,凛、桃,"[""EAUX"",""Other""]"';
     final service = CsvService();
 
     final first = await service.importCsv(
@@ -315,6 +318,7 @@ void main() {
     final second = await service.importCsv(exportedBytes);
     final db = await DatabaseHelper.instance.database;
     final records = await db.query('records', orderBy: 'record_type');
+    final recordGroups = await db.query('record_groups', orderBy: 'position');
 
     expect(first.newRecords, 2);
     expect(first.errors, 0);
@@ -322,6 +326,7 @@ void main() {
     expect(exportedText, contains(',,,EAUX,'));
     expect(exportedText, contains(',团切,'));
     expect(exportedText, contains(',团切,,凛、桃'));
+    expect(exportedText, contains('[""EAUX"",""Other""]'));
     expect(second.skipped, 2);
     expect(second.errors, 0);
     expect(records, hasLength(2));
@@ -331,6 +336,7 @@ void main() {
       )['group_members'],
       '凛、桃',
     );
+    expect(recordGroups.map((row) => row['group_name']), ['EAUX', 'Other']);
   });
 
   test('CSV 16-column import preserves a custom idol color', () async {

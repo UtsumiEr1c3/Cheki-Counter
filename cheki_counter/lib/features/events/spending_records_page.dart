@@ -134,7 +134,7 @@ class SpendingRecordTile extends StatelessWidget {
     return switch (record.recordType) {
       ChekiRecordType.normal => row.idolName ?? '未知偶像',
       ChekiRecordType.theme => row.idolName ?? '未知偶像',
-      ChekiRecordType.group => record.groupName ?? '未命名团体',
+      ChekiRecordType.group => record.groupDisplayName ?? '未命名团体',
     };
   }
 

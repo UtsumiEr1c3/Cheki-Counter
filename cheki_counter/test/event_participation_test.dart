@@ -140,11 +140,15 @@ void main() {
     final db = await DatabaseHelper.instance.database;
     final columns = await db.rawQuery('PRAGMA table_info(records)');
     final records = await db.query('records');
+    final recordGroups = await db.query('record_groups');
 
     expect(columns.any((row) => row['name'] == 'group_members'), isTrue);
     expect(records.single['record_type'], 'group');
     expect(records.single['group_name'], '旧团体');
     expect(records.single['group_members'], isNull);
+    expect(recordGroups.single['record_id'], records.single['id']);
+    expect(recordGroups.single['group_name'], '旧团体');
+    expect(recordGroups.single['position'], 0);
   });
 
   test('支出统计包含全部切奇且只累计现场门票', () async {

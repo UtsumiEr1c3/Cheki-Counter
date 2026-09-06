@@ -31,8 +31,15 @@ class IdolRepository {
     final rows = await db.rawQuery('''
       SELECT group_name FROM idols WHERE group_name != ''
       UNION
-      SELECT group_name FROM records
-      WHERE record_type = 'group' AND group_name IS NOT NULL AND group_name != ''
+      SELECT group_name FROM record_groups WHERE group_name != ''
+      UNION
+      SELECT r.group_name FROM records r
+      WHERE r.record_type = 'group'
+        AND r.group_name IS NOT NULL
+        AND r.group_name != ''
+        AND NOT EXISTS (
+          SELECT 1 FROM record_groups rg WHERE rg.record_id = r.id
+        )
       ORDER BY group_name
     ''');
     return rows.map((row) => row['group_name'] as String).toList();
@@ -48,6 +55,53 @@ class IdolRepository {
       orderBy: 'name ASC, id ASC',
     );
     return rows.map((row) => row['name'] as String).toList();
+  }
+
+  Future<List<String>> getSuggestedMemberNamesByGroup(String groupName) async {
+    final currentMembers = await getMemberNamesByGroup(groupName);
+    final db = await _db;
+    final rows = await db.rawQuery(
+      '''
+      WITH group_links AS (
+        SELECT record_id, group_name FROM record_groups
+        UNION ALL
+        SELECT r.id, r.group_name
+        FROM records r
+        WHERE r.record_type = 'group'
+          AND r.group_name IS NOT NULL
+          AND r.group_name != ''
+          AND NOT EXISTS (
+            SELECT 1 FROM record_groups rg WHERE rg.record_id = r.id
+          )
+      )
+      SELECT r.group_members
+      FROM records r
+      JOIN group_links gl ON gl.record_id = r.id
+      WHERE gl.group_name = ?
+        AND r.record_type = 'group'
+        AND r.group_members IS NOT NULL
+        AND r.group_members != ''
+      ORDER BY r.date DESC, r.created_at DESC, r.id DESC
+      LIMIT 1
+    ''',
+      [groupName],
+    );
+    final result = <String>[];
+    final seen = <String>{};
+    void addNames(Iterable<String> names) {
+      for (final name in names) {
+        final trimmed = name.trim();
+        if (trimmed.isNotEmpty && seen.add(trimmed)) result.add(trimmed);
+      }
+    }
+
+    addNames(currentMembers);
+    if (rows.isNotEmpty) {
+      addNames(
+        (rows.first['group_members'] as String).split(RegExp(r'[,，、\n]')),
+      );
+    }
+    return result;
   }
 
   /// Get all idols with aggregated count and amount.
@@ -247,21 +301,31 @@ class IdolRepository {
       GROUP BY i.group_name
     ''', args);
 
-    final groupConditions = <String>[
-      "record_type = 'group'",
-      "group_name IS NOT NULL",
-    ];
+    final groupConditions = <String>["r.record_type = 'group'"];
     final groupArgs = <Object?>[];
     if (year != null) {
-      groupConditions.add("strftime('%Y', date) = ?");
+      groupConditions.add("strftime('%Y', r.date) = ?");
       groupArgs.add(year);
     }
     final groupRows = await db.rawQuery('''
-      SELECT group_name, SUM(count) AS total_count,
-             SUM(subtotal) AS total_amount
-      FROM records
+      WITH group_links AS (
+        SELECT record_id, group_name FROM record_groups
+        UNION ALL
+        SELECT r.id, r.group_name
+        FROM records r
+        WHERE r.record_type = 'group'
+          AND r.group_name IS NOT NULL
+          AND r.group_name != ''
+          AND NOT EXISTS (
+            SELECT 1 FROM record_groups rg WHERE rg.record_id = r.id
+          )
+      )
+      SELECT gl.group_name, SUM(r.count) AS total_count,
+             SUM(r.subtotal) AS total_amount
+      FROM records r
+      JOIN group_links gl ON gl.record_id = r.id
       WHERE ${groupConditions.join(' AND ')}
-      GROUP BY group_name
+      GROUP BY gl.group_name
     ''', groupArgs);
 
     final merged = <String, Map<String, dynamic>>{};

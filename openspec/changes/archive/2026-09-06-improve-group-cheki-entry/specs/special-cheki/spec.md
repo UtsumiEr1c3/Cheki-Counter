@@ -1,22 +1,4 @@
-# special-cheki Specification
-
-## Purpose
-
-定义主题切与活动团切的创建条件、数据归属、成员快照及统计行为，确保两类特殊切在个人、团体、活动和整体支出中得到一致且不重复的计算。
-## Requirements
-### Requirement: 主题切
-
-系统 SHALL 支持记录属于单个偶像且不关联活动的主题切。主题切 MUST 保存主题名称、日期、数量、单价、小计和现场方式，并计入该偶像、团体和整体支出统计。
-
-#### Scenario: 添加主题切
-
-- **WHEN** 用户选择偶像并填写“春节主题切”、日期、数量和单价
-- **THEN** 系统新增 `record_type = theme`、`idol_id` 指向所选偶像、`event_id = NULL` 的记录
-
-#### Scenario: 标记已有无活动记录
-
-- **WHEN** 用户在偶像详情将一条无活动普通记录标记为主题切
-- **THEN** 系统保存主题名称且保持原数量、金额、日期和现场方式不变
+## MODIFIED Requirements
 
 ### Requirement: 活动团切
 
@@ -46,17 +28,3 @@
 
 - **WHEN** 一个包含多个成员和团体的联合团切被保存
 - **THEN** 活动和整体总切数只增加一次，任一成员的个人切数均不增加
-
-### Requirement: 特殊切允许零元单价
-
-主题切和活动团切 SHALL 保持数量为正整数，并接受单价为 0 的非负整数。
-
-#### Scenario: 添加零元主题切
-
-- **WHEN** 用户填写完整主题切信息、数量 `1` 和单价 `0` 后提交
-- **THEN** 系统 SHALL 保存 `record_type = theme`、`unit_price = 0`、`subtotal = 0` 的记录
-
-#### Scenario: 添加零元团切
-
-- **WHEN** 用户填写完整团切信息、数量 `1` 和单价 `0` 后提交
-- **THEN** 系统 SHALL 保存 `record_type = group`、`unit_price = 0`、`subtotal = 0` 的记录

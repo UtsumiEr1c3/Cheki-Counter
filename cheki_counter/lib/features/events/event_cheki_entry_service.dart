@@ -97,7 +97,7 @@ class EventChekiEntryService {
 
   Future<int> addGroupRecord({
     required CheckiEvent event,
-    required String groupName,
+    required List<String> groupNames,
     required String groupMembers,
     required int count,
     required int unitPrice,
@@ -106,9 +106,13 @@ class EventChekiEntryService {
     _validateEvent(event);
     _validatePositive(count, 'count');
     _validateNonNegative(unitPrice, 'unitPrice');
-    final trimmedGroup = groupName.trim();
-    if (trimmedGroup.isEmpty) {
-      throw ArgumentError.value(groupName, 'groupName', 'must not be empty');
+    final normalizedGroups = groupNames
+        .map((name) => name.trim())
+        .where((name) => name.isNotEmpty)
+        .toSet()
+        .toList();
+    if (normalizedGroups.isEmpty) {
+      throw ArgumentError.value(groupNames, 'groupNames', 'must not be empty');
     }
     final normalizedMembers = groupMembers
         .split(RegExp(r'[,，、\n]'))
@@ -134,7 +138,8 @@ class EventChekiEntryService {
         eventId: event.id,
         isOnline: event.isOnline,
         recordType: ChekiRecordType.group,
-        groupName: trimmedGroup,
+        groupName: normalizedGroups.first,
+        groupNames: normalizedGroups,
         groupMembers: normalizedMembers,
       ),
     );

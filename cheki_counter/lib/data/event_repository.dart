@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:cheki_counter/data/db.dart';
 import 'package:cheki_counter/data/models/event.dart';
+import 'package:cheki_counter/data/record_repository.dart';
 
 class EventWithSummary {
   final CheckiEvent event;
@@ -305,15 +306,19 @@ class EventRepository {
     ''', ids);
 
     final groupRows = await db.rawQuery('''
-      SELECT r.event_id, r.group_name, SUM(r.count) AS cnt
+      SELECT r.id, r.event_id, r.group_name, r.count
       FROM records r
       JOIN events e ON e.id = r.event_id
       WHERE r.event_id IN ($placeholders)
         AND r.record_type = 'group'
         AND r.is_online = e.is_online
-      GROUP BY r.event_id, r.group_name
-      ORDER BY cnt DESC, r.group_name ASC
+      ORDER BY r.event_id, r.id
     ''', ids);
+    final groupNamesByRecord = await RecordRepository()
+        .getGroupNamesForRecordIds(
+          groupRows.map((row) => row['id'] as int),
+          executor: db,
+        );
 
     final byEvent = <int, List<IdolSummaryEntry>>{};
     for (final row in idolRows) {
@@ -329,16 +334,29 @@ class EventRepository {
             ),
           );
     }
+    final groupCounts = <String, int>{};
     for (final row in groupRows) {
-      final eid = row['event_id'] as int;
+      final recordId = row['id'] as int;
+      final eventId = row['event_id'] as int;
+      final groupNames = groupNamesByRecord[recordId];
+      final label = groupNames == null || groupNames.isEmpty
+          ? row['group_name'] as String? ?? '未命名团体'
+          : groupNames.join(' / ');
+      final key = '$eventId\u001f$label';
+      groupCounts[key] = (groupCounts[key] ?? 0) + (row['count'] as int);
+    }
+    for (final entry in groupCounts.entries) {
+      final separator = entry.key.indexOf('\u001f');
+      final eid = int.parse(entry.key.substring(0, separator));
+      final label = entry.key.substring(separator + 1);
       byEvent
           .putIfAbsent(eid, () => [])
           .add(
             IdolSummaryEntry(
-              name: '${row['group_name']}团切',
+              name: '$label团切',
               color: '',
               colorValue: 0,
-              count: (row['cnt'] as num).toInt(),
+              count: entry.value,
               isGroup: true,
             ),
           );

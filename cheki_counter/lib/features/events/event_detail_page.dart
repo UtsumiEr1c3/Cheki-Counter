@@ -98,7 +98,9 @@ class _EventDetailPageState extends State<EventDetailPage> {
     final grouped = <String, List<Map<String, dynamic>>>{};
     for (final r in _records) {
       final isGroup = r['record_type'] == 'group';
-      final key = isGroup ? 'group:${r['group_name']}' : 'idol:${r['idol_id']}';
+      final key = isGroup
+          ? 'group:${_groupDisplayName(r)}'
+          : 'idol:${r['idol_id']}';
       grouped.putIfAbsent(key, () => []).add(r);
     }
 
@@ -169,7 +171,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
               final first = rows.first;
               final isGroup = first['record_type'] == 'group';
               final subjectName = isGroup
-                  ? '${first['group_name']}团切'
+                  ? '${_groupDisplayName(first)}团切'
                   : first['idol_name'] as String;
               final idolColorValue = first['idol_color_value'] as int?;
               final groupCount = rows.fold<int>(
@@ -223,5 +225,13 @@ class _EventDetailPageState extends State<EventDetailPage> {
         ],
       ),
     );
+  }
+
+  String _groupDisplayName(Map<String, dynamic> row) {
+    final groupNames = row['group_names'] as String?;
+    if (groupNames != null && groupNames.isNotEmpty) {
+      return groupNames.split(RecordRepository.groupNamesSeparator).join(' / ');
+    }
+    return row['group_name'] as String? ?? '未命名团体';
   }
 }

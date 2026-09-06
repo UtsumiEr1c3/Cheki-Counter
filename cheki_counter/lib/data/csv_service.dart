@@ -46,6 +46,7 @@ class CsvService {
     '切奇类型',
     '切奇名称',
     '团切成员',
+    '团切团体',
   ];
 
   /// Import CSV from file bytes. Merge-append semantics.
@@ -77,6 +78,7 @@ class CsvService {
     final recordTypeIndex = header.indexOf('切奇类型');
     final specialNameIndex = header.indexOf('切奇名称');
     final groupMembersIndex = header.indexOf('团切成员');
+    final groupNamesIndex = header.indexOf('团切团体');
     final offset = hasStableIdColumn ? 1 : 0;
     if (header.length < 9 + offset) {
       result.errors = 1;
@@ -124,6 +126,12 @@ class CsvService {
         final groupMembers = groupMembersIndex >= 0
             ? col(groupMembersIndex)
             : '';
+        final groupNames = recordType == ChekiRecordType.group
+            ? _parseGroupNames(
+                groupNamesIndex >= 0 ? col(groupNamesIndex) : '',
+                group,
+              )
+            : const <String>[];
 
         // Event side
         final eventName = col(offset + 9);
@@ -173,7 +181,7 @@ class CsvService {
         final hasIndividualRecord = name.isNotEmpty && hasRecordFields;
         final hasGroupRecord =
             recordType == ChekiRecordType.group &&
-            group.isNotEmpty &&
+            groupNames.isNotEmpty &&
             hasRecordFields;
         final hasRecord = hasIndividualRecord || hasGroupRecord;
 
@@ -282,7 +290,7 @@ class CsvService {
             ? specialName
             : null;
         final normalizedGroupName = recordType == ChekiRecordType.group
-            ? group
+            ? groupNames.first
             : null;
         final normalizedGroupMembers = recordType == ChekiRecordType.group
             ? groupMembers
@@ -300,6 +308,7 @@ class CsvService {
             isOnline: isOnline,
             recordType: recordType,
             groupName: normalizedGroupName,
+            groupNames: groupNames,
             groupMembers: normalizedGroupMembers,
           );
           if (exists) {
@@ -317,6 +326,7 @@ class CsvService {
                 isOnline: isOnline,
                 recordType: recordType,
                 groupName: normalizedGroupName,
+                groupNames: groupNames,
                 groupMembers: normalizedGroupMembers,
               ),
             );
@@ -452,6 +462,12 @@ class CsvService {
       )
       ORDER BY e.date DESC, e.id ASC
     ''');
+    final groupNamesByRecord = await _recordRepo.getGroupNamesForRecordIds(
+      recordRows
+          .where((row) => row['record_type'] == ChekiRecordType.group.value)
+          .map((row) => row['r_id'] as int),
+      executor: db,
+    );
 
     // Merge-sort by event date (desc), keeping record rows' tie-break by r.id.
     final combined = <_ExportRow>[];
@@ -504,6 +520,12 @@ class CsvService {
             ChekiRecordType.fromValue(d['record_type']).label,
             d['special_name'] ?? '',
             d['group_members'] ?? '',
+            d['record_type'] == ChekiRecordType.group.value
+                ? jsonEncode(
+                    groupNamesByRecord[d['r_id']] ??
+                        [d['record_group_name'] as String? ?? ''],
+                  )
+                : '',
           ];
         } else {
           return [
@@ -528,6 +550,7 @@ class CsvService {
             '',
             '',
             '',
+            '',
           ];
         }
       }),
@@ -541,6 +564,33 @@ class CsvService {
     await file.writeAsBytes([...bom, ...utf8.encode(csvString)]);
 
     return file.path;
+  }
+
+  List<String> _parseGroupNames(String encoded, String fallback) {
+    final result = <String>[];
+    final seen = <String>{};
+    void add(String value) {
+      final trimmed = value.trim();
+      if (trimmed.isNotEmpty && seen.add(trimmed)) result.add(trimmed);
+    }
+
+    if (encoded.isNotEmpty) {
+      Object? decoded;
+      try {
+        decoded = jsonDecode(encoded);
+      } on FormatException {
+        throw const FormatException('团切团体格式无效');
+      }
+      if (decoded is! List || decoded.any((value) => value is! String)) {
+        throw const FormatException('团切团体格式无效');
+      }
+      for (final value in decoded.cast<String>()) {
+        add(value);
+      }
+    } else {
+      add(fallback);
+    }
+    return result;
   }
 }
 

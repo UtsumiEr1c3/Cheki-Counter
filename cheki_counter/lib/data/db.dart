@@ -28,7 +28,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 9,
+      version: 10,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -92,6 +92,7 @@ class DatabaseHelper {
         FOREIGN KEY (event_id) REFERENCES events (id)
       )
     ''');
+    await _createRecordGroupsTable(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -219,6 +220,33 @@ class DatabaseHelper {
     if (oldVersion < 9) {
       await db.execute('ALTER TABLE records ADD COLUMN group_members TEXT');
     }
+    if (oldVersion < 10) {
+      await _createRecordGroupsTable(db);
+      await db.execute('''
+        INSERT OR IGNORE INTO record_groups (record_id, group_name, position)
+        SELECT id, group_name, 0
+        FROM records
+        WHERE record_type = 'group'
+          AND group_name IS NOT NULL
+          AND group_name != ''
+      ''');
+    }
+  }
+
+  Future<void> _createRecordGroupsTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS record_groups (
+        record_id INTEGER NOT NULL,
+        group_name TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        PRIMARY KEY (record_id, group_name),
+        FOREIGN KEY (record_id) REFERENCES records (id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_record_groups_group_name
+      ON record_groups(group_name)
+    ''');
   }
 
   String _generateStableId(Random random, int id) {

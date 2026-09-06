@@ -38,6 +38,7 @@ class CheckiRecord {
   final ChekiRecordType recordType;
   final String? specialName;
   final String? groupName;
+  final List<String> groupNames;
   final String? groupMembers;
 
   CheckiRecord({
@@ -54,8 +55,20 @@ class CheckiRecord {
     this.recordType = ChekiRecordType.normal,
     this.specialName,
     this.groupName,
+    this.groupNames = const [],
     this.groupMembers,
   });
+
+  List<String> get effectiveGroupNames {
+    if (groupNames.isNotEmpty) return groupNames;
+    final fallback = groupName?.trim() ?? '';
+    return fallback.isEmpty ? const [] : [fallback];
+  }
+
+  String? get groupDisplayName {
+    final names = effectiveGroupNames;
+    return names.isEmpty ? null : names.join(' / ');
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -91,7 +104,17 @@ class CheckiRecord {
       recordType: ChekiRecordType.fromValue(map['record_type']),
       specialName: map['special_name'] as String?,
       groupName: map['group_name'] as String?,
+      groupNames: _parseGroupNames(map['group_names']),
       groupMembers: map['group_members'] as String?,
     );
+  }
+
+  static List<String> _parseGroupNames(Object? value) {
+    if (value is! String || value.isEmpty) return const [];
+    return value
+        .split('\u001f')
+        .map((name) => name.trim())
+        .where((name) => name.isNotEmpty)
+        .toList(growable: false);
   }
 }

@@ -20,7 +20,9 @@ class _EventGroupChekiDialogState extends State<EventGroupChekiDialog> {
   final _countController = TextEditingController(text: '1');
   final _priceController = TextEditingController(text: '60');
   List<String> _groups = [];
-  String _group = '';
+  final List<String> _selectedGroups = [];
+  TextEditingController? _groupInputController;
+  String? _groupError;
   bool _loading = true;
   bool _saving = false;
 
@@ -38,10 +40,33 @@ class _EventGroupChekiDialogState extends State<EventGroupChekiDialog> {
     super.dispose();
   }
 
-  Future<void> _prefillMembers(String groupName) async {
-    final names = await _idolRepo.getMemberNamesByGroup(groupName);
-    if (!mounted || _group != groupName) return;
-    _membersController.text = names.join('、');
+  Future<void> _addGroup(String rawGroupName) async {
+    final groupName = rawGroupName.trim();
+    if (groupName.isEmpty) return;
+    if (!_selectedGroups.contains(groupName)) {
+      setState(() {
+        _selectedGroups.add(groupName);
+        _groupError = null;
+      });
+    }
+    _groupInputController?.clear();
+
+    final names = await _idolRepo.getSuggestedMemberNamesByGroup(groupName);
+    if (!mounted || !_selectedGroups.contains(groupName)) return;
+    final merged = <String>[];
+    final seen = <String>{};
+    for (final name in [
+      ..._membersController.text.split(RegExp(r'[,，、\n]')),
+      ...names,
+    ]) {
+      final trimmed = name.trim();
+      if (trimmed.isNotEmpty && seen.add(trimmed)) merged.add(trimmed);
+    }
+    _membersController.text = merged.join('、');
+  }
+
+  void _removeGroup(String groupName) {
+    setState(() => _selectedGroups.remove(groupName));
   }
 
   Future<void> _loadGroups() async {
@@ -54,11 +79,17 @@ class _EventGroupChekiDialogState extends State<EventGroupChekiDialog> {
   }
 
   Future<void> _submit() async {
+    final pendingGroup = _groupInputController?.text.trim() ?? '';
+    if (pendingGroup.isNotEmpty) await _addGroup(pendingGroup);
+    if (_selectedGroups.isEmpty) {
+      setState(() => _groupError = '请至少添加一个团体');
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     await _service.addGroupRecord(
       event: widget.event,
-      groupName: _group,
+      groupNames: _selectedGroups,
       groupMembers: _membersController.text,
       count: int.parse(_countController.text.trim()),
       unitPrice: int.parse(_priceController.text.trim()),
@@ -101,33 +132,48 @@ class _EventGroupChekiDialogState extends State<EventGroupChekiDialog> {
               Autocomplete<String>(
                 optionsBuilder: (textEditingValue) {
                   final query = textEditingValue.text.trim().toLowerCase();
-                  if (query.isEmpty) return _groups;
-                  return _groups.where(
+                  final availableGroups = _groups.where(
+                    (group) => !_selectedGroups.contains(group),
+                  );
+                  if (query.isEmpty) return availableGroups;
+                  return availableGroups.where(
                     (group) => group.toLowerCase().contains(query),
                   );
                 },
-                onSelected: (value) {
-                  _group = value;
-                  _prefillMembers(value);
-                },
+                onSelected: _addGroup,
                 fieldViewBuilder:
                     (context, controller, focusNode, onFieldSubmitted) {
+                      _groupInputController = controller;
                       return TextFormField(
                         controller: controller,
                         focusNode: focusNode,
                         decoration: const InputDecoration(
-                          labelText: '团体',
-                          hintText: '选择已有团体或输入新团体',
+                          labelText: '添加团体',
+                          hintText: '选择或输入后按回车添加',
                           border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) => _group = value,
-                        validator: (value) =>
-                            value == null || value.trim().isEmpty
-                            ? '请输入团体'
-                            : null,
+                        ).copyWith(errorText: _groupError),
+                        onFieldSubmitted: _addGroup,
                       );
                     },
               ),
+              if (_selectedGroups.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: _selectedGroups
+                        .map(
+                          (group) => InputChip(
+                            label: Text(group),
+                            onDeleted: () => _removeGroup(group),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               TextFormField(
                 controller: _membersController,

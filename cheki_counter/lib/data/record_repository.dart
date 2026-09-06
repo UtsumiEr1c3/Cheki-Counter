@@ -28,12 +28,39 @@ class SpendingRecordRow {
 }
 
 class RecordRepository {
+  static const groupNamesSeparator = '\u001f';
+
   Future<Database> get _db => DatabaseHelper.instance.database;
 
   /// Insert a new record.
   Future<int> insert(CheckiRecord record, {DatabaseExecutor? executor}) async {
-    final db = executor ?? await _db;
-    return await db.insert('records', record.toMap());
+    if (record.recordType != ChekiRecordType.group) {
+      final db = executor ?? await _db;
+      return db.insert('records', record.toMap());
+    }
+
+    final groupNames = _normalizeGroupNames(record.effectiveGroupNames);
+    if (groupNames.isEmpty) {
+      throw ArgumentError.value(groupNames, 'groupNames', 'must not be empty');
+    }
+
+    Future<int> insertGroupRecord(DatabaseExecutor db) async {
+      final recordMap = record.toMap()..['group_name'] = groupNames.first;
+      final recordId = await db.insert('records', recordMap);
+      for (var i = 0; i < groupNames.length; i++) {
+        await db.insert('record_groups', {
+          'record_id': recordId,
+          'group_name': groupNames[i],
+          'position': i,
+        });
+      }
+      return recordId;
+    }
+
+    if (executor is Database) return executor.transaction(insertGroupRecord);
+    if (executor != null) return insertGroupRecord(executor);
+    final db = await _db;
+    return db.transaction(insertGroupRecord);
   }
 
   /// Delete a record and clean up the idol if no records remain.
@@ -54,7 +81,11 @@ class RecordRepository {
 
       final idolId = record.first['idol_id'] as int?;
 
-      // Delete the record
+      await txn.delete(
+        'record_groups',
+        where: 'record_id = ?',
+        whereArgs: [recordId],
+      );
       await txn.delete('records', where: 'id = ?', whereArgs: [recordId]);
 
       if (idolId == null) return;
@@ -142,7 +173,8 @@ class RecordRepository {
       $where
       ORDER BY r.date DESC, r.created_at DESC, r.id DESC
     ''', args);
-    return rows
+    final rowsWithGroups = await _attachGroupNames(db, rows);
+    return rowsWithGroups
         .map(
           (row) => SpendingRecordRow(
             record: CheckiRecord.fromMap(row),
@@ -158,7 +190,7 @@ class RecordRepository {
   /// List all records for a given event, ordered by idol and created_at.
   Future<List<Map<String, dynamic>>> getByEventId(int eventId) async {
     final db = await _db;
-    return await db.rawQuery(
+    final rows = await db.rawQuery(
       '''
       SELECT r.id, r.idol_id, r.date, r.count, r.unit_price, r.subtotal,
              r.venue, r.created_at, r.event_id, r.is_online,
@@ -173,6 +205,7 @@ class RecordRepository {
     ''',
       [eventId],
     );
+    return _attachGroupNames(db, rows);
   }
 
   /// Get the last unit price for a given idol (by created_at).
@@ -231,16 +264,29 @@ class RecordRepository {
     String? year,
   }) async {
     final db = await _db;
-    final conditions = <String>["record_type = 'group'", 'group_name = ?'];
+    final conditions = <String>["r.record_type = 'group'", 'gl.group_name = ?'];
     final args = <Object?>[groupName];
     if (year != null) {
-      conditions.add("strftime('%Y', date) = ?");
+      conditions.add("strftime('%Y', r.date) = ?");
       args.add(year);
     }
     final rows = await db.rawQuery('''
+      WITH group_links AS (
+        SELECT record_id, group_name FROM record_groups
+        UNION ALL
+        SELECT r.id, r.group_name
+        FROM records r
+        WHERE r.record_type = 'group'
+          AND r.group_name IS NOT NULL
+          AND r.group_name != ''
+          AND NOT EXISTS (
+            SELECT 1 FROM record_groups rg WHERE rg.record_id = r.id
+          )
+      )
       SELECT COALESCE(SUM(count), 0) AS total_count,
              COALESCE(SUM(subtotal), 0) AS total_amount
-      FROM records
+      FROM records r
+      JOIN group_links gl ON gl.record_id = r.id
       WHERE ${conditions.join(' AND ')}
     ''', args);
     final row = rows.single;
@@ -348,13 +394,20 @@ class RecordRepository {
     ChekiRecordType recordType = ChekiRecordType.normal,
     String? specialName,
     String? groupName,
+    List<String>? groupNames,
     String? groupMembers,
     DatabaseExecutor? executor,
   }) async {
     final db = executor ?? await _db;
+    final normalizedGroupNames = _normalizeGroupNames(
+      groupNames ?? (groupName == null ? const [] : [groupName]),
+    );
+    final normalizedGroupName = normalizedGroupNames.isEmpty
+        ? groupName
+        : normalizedGroupNames.first;
     final result = await db.rawQuery(
       '''
-      SELECT 1 FROM records
+      SELECT id FROM records
       WHERE ((idol_id IS NULL AND ? IS NULL) OR idol_id = ?)
         AND date = ? AND count = ?
         AND unit_price = ? AND venue = ? AND created_at = ?
@@ -364,7 +417,6 @@ class RecordRepository {
         AND ((special_name IS NULL AND ? IS NULL) OR special_name = ?)
         AND ((group_name IS NULL AND ? IS NULL) OR group_name = ?)
         AND ((group_members IS NULL AND ? IS NULL) OR group_members = ?)
-      LIMIT 1
     ''',
       [
         idolId,
@@ -380,12 +432,106 @@ class RecordRepository {
         recordType.value,
         specialName,
         specialName,
-        groupName,
-        groupName,
+        normalizedGroupName,
+        normalizedGroupName,
         groupMembers,
         groupMembers,
       ],
     );
-    return result.isNotEmpty;
+    if (result.isEmpty || recordType != ChekiRecordType.group) {
+      return result.isNotEmpty;
+    }
+    final linked = await getGroupNamesForRecordIds(
+      result.map((row) => row['id'] as int),
+      executor: db,
+    );
+    return result.any(
+      (row) => _sameGroupNames(
+        linked[row['id'] as int] ?? const [],
+        normalizedGroupNames,
+      ),
+    );
+  }
+
+  Future<Map<int, List<String>>> getGroupNamesForRecordIds(
+    Iterable<int> recordIds, {
+    DatabaseExecutor? executor,
+  }) async {
+    final ids = recordIds.toSet().toList();
+    if (ids.isEmpty) return {};
+    final db = executor ?? await _db;
+    final result = <int, List<String>>{};
+    for (var offset = 0; offset < ids.length; offset += 900) {
+      final end = offset + 900 < ids.length ? offset + 900 : ids.length;
+      final chunk = ids.sublist(offset, end);
+      final placeholders = List.filled(chunk.length, '?').join(',');
+      final rows = await db.rawQuery('''
+        SELECT record_id, group_name, position
+        FROM record_groups
+        WHERE record_id IN ($placeholders)
+        ORDER BY record_id, position
+      ''', chunk);
+      for (final row in rows) {
+        result
+            .putIfAbsent(row['record_id'] as int, () => [])
+            .add(row['group_name'] as String);
+      }
+
+      final fallbackRows = await db.rawQuery('''
+        SELECT id, group_name
+        FROM records
+        WHERE id IN ($placeholders)
+          AND record_type = 'group'
+          AND group_name IS NOT NULL
+          AND group_name != ''
+          AND NOT EXISTS (
+            SELECT 1 FROM record_groups rg WHERE rg.record_id = records.id
+          )
+      ''', chunk);
+      for (final row in fallbackRows) {
+        result[row['id'] as int] = [row['group_name'] as String];
+      }
+    }
+    return result;
+  }
+
+  Future<List<Map<String, dynamic>>> _attachGroupNames(
+    DatabaseExecutor db,
+    List<Map<String, Object?>> rows,
+  ) async {
+    final groupIds = rows
+        .where((row) => row['record_type'] == ChekiRecordType.group.value)
+        .map((row) => row['id'] as int)
+        .toList();
+    final groupsByRecord = await getGroupNamesForRecordIds(
+      groupIds,
+      executor: db,
+    );
+    return rows.map((row) {
+      final copy = Map<String, dynamic>.from(row);
+      final names = groupsByRecord[row['id']];
+      if (names != null && names.isNotEmpty) {
+        copy['group_names'] = names.join(groupNamesSeparator);
+      }
+      return copy;
+    }).toList();
+  }
+
+  List<String> _normalizeGroupNames(Iterable<String> names) {
+    final result = <String>[];
+    final seen = <String>{};
+    for (final name in names) {
+      final trimmed = name.trim();
+      if (trimmed.isNotEmpty && seen.add(trimmed)) result.add(trimmed);
+    }
+    return result;
+  }
+
+  bool _sameGroupNames(List<String> left, List<String> right) {
+    if (left.length != right.length) return false;
+    for (var i = 0; i < left.length; i++) {
+      if (left[i] != right[i]) return false;
+    }
+    return true;
   }
 }
