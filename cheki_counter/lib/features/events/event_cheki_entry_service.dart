@@ -95,6 +95,51 @@ class EventChekiEntryService {
     );
   }
 
+  Future<int> addGroupRecord({
+    required CheckiEvent event,
+    required String groupName,
+    required String groupMembers,
+    required int count,
+    required int unitPrice,
+    String? createdAt,
+  }) async {
+    _validateEvent(event);
+    _validatePositive(count, 'count');
+    _validatePositive(unitPrice, 'unitPrice');
+    final trimmedGroup = groupName.trim();
+    if (trimmedGroup.isEmpty) {
+      throw ArgumentError.value(groupName, 'groupName', 'must not be empty');
+    }
+    final normalizedMembers = groupMembers
+        .split(RegExp(r'[,，、\n]'))
+        .map((name) => name.trim())
+        .where((name) => name.isNotEmpty)
+        .toSet()
+        .join('、');
+    if (normalizedMembers.isEmpty) {
+      throw ArgumentError.value(
+        groupMembers,
+        'groupMembers',
+        'must not be empty',
+      );
+    }
+    return _recordRepo.insert(
+      CheckiRecord(
+        date: event.date,
+        count: count,
+        unitPrice: unitPrice,
+        subtotal: count * unitPrice,
+        venue: event.venue,
+        createdAt: createdAt ?? DateTime.now().toIso8601String(),
+        eventId: event.id,
+        isOnline: event.isOnline,
+        recordType: ChekiRecordType.group,
+        groupName: trimmedGroup,
+        groupMembers: normalizedMembers,
+      ),
+    );
+  }
+
   void _validateEvent(CheckiEvent event) {
     if (event.id == null) {
       throw ArgumentError.value(event.id, 'event.id', 'must not be null');

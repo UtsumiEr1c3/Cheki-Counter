@@ -95,6 +95,16 @@ class _IdolChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (entry.isGroup) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.groups_outlined, size: 14),
+          const SizedBox(width: 4),
+          Text('${entry.name} ×${entry.count}'),
+        ],
+      );
+    }
     final color = colorFromValue(entry.colorValue);
     return Row(
       mainAxisSize: MainAxisSize.min,

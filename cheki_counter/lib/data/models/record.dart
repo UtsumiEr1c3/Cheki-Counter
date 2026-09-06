@@ -1,6 +1,32 @@
+enum ChekiRecordType {
+  normal('normal', '普通切'),
+  theme('theme', '主题切'),
+  group('group', '团切');
+
+  final String value;
+  final String label;
+
+  const ChekiRecordType(this.value, this.label);
+
+  static ChekiRecordType fromValue(Object? value) {
+    return ChekiRecordType.values.firstWhere(
+      (type) => type.value == value,
+      orElse: () => ChekiRecordType.normal,
+    );
+  }
+
+  static ChekiRecordType fromCsv(String value) {
+    return switch (value.trim()) {
+      '主题切' || 'theme' => ChekiRecordType.theme,
+      '团切' || 'group' => ChekiRecordType.group,
+      _ => ChekiRecordType.normal,
+    };
+  }
+}
+
 class CheckiRecord {
   final int? id;
-  final int idolId;
+  final int? idolId;
   final String date;
   final int count;
   final int unitPrice;
@@ -9,10 +35,14 @@ class CheckiRecord {
   final String createdAt;
   final int? eventId;
   final bool isOnline;
+  final ChekiRecordType recordType;
+  final String? specialName;
+  final String? groupName;
+  final String? groupMembers;
 
   CheckiRecord({
     this.id,
-    required this.idolId,
+    this.idolId,
     required this.date,
     required this.count,
     required this.unitPrice,
@@ -21,6 +51,10 @@ class CheckiRecord {
     required this.createdAt,
     this.eventId,
     this.isOnline = false,
+    this.recordType = ChekiRecordType.normal,
+    this.specialName,
+    this.groupName,
+    this.groupMembers,
   });
 
   Map<String, dynamic> toMap() {
@@ -35,13 +69,17 @@ class CheckiRecord {
       'created_at': createdAt,
       'event_id': eventId,
       'is_online': isOnline ? 1 : 0,
+      'record_type': recordType.value,
+      'special_name': specialName,
+      'group_name': groupName,
+      'group_members': groupMembers,
     };
   }
 
   factory CheckiRecord.fromMap(Map<String, dynamic> map) {
     return CheckiRecord(
       id: map['id'] as int?,
-      idolId: map['idol_id'] as int,
+      idolId: map['idol_id'] as int?,
       date: map['date'] as String,
       count: map['count'] as int,
       unitPrice: map['unit_price'] as int,
@@ -50,6 +88,10 @@ class CheckiRecord {
       createdAt: map['created_at'] as String,
       eventId: map['event_id'] as int?,
       isOnline: (map['is_online'] as int?) == 1,
+      recordType: ChekiRecordType.fromValue(map['record_type']),
+      specialName: map['special_name'] as String?,
+      groupName: map['group_name'] as String?,
+      groupMembers: map['group_members'] as String?,
     );
   }
 }

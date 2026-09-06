@@ -4,6 +4,7 @@ import 'package:cheki_counter/data/csv_service.dart';
 import 'package:cheki_counter/data/db.dart';
 import 'package:cheki_counter/data/event_repository.dart';
 import 'package:cheki_counter/data/models/event.dart';
+import 'package:cheki_counter/data/models/record.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -84,10 +85,68 @@ void main() {
       where: 'id = ?',
       whereArgs: [emptyId],
     );
+    final recordColumns = await db.rawQuery('PRAGMA table_info(records)');
+    final migratedRecords = await db.query('records');
     expect(online.single['is_online'], 1);
     expect(empty.single['is_online'], 0);
     expect(online.single['stable_id'], isNotEmpty);
     expect(empty.single['stable_id'], isNotEmpty);
+    expect(
+      recordColumns.singleWhere((row) => row['name'] == 'idol_id')['notnull'],
+      0,
+    );
+    expect(
+      recordColumns.any((row) => row['name'] == 'group_members'),
+      isTrue,
+    );
+    expect(migratedRecords.single['record_type'], 'normal');
+  });
+
+  test('v8 数据库升级时保留团切并增加成员快照列', () async {
+    final oldDb = await openDatabase(
+      await _databasePath(),
+      version: 8,
+      onCreate: (db, _) async {
+        await db.execute('''
+          CREATE TABLE records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            idol_id INTEGER,
+            date TEXT NOT NULL,
+            count INTEGER NOT NULL,
+            unit_price INTEGER NOT NULL,
+            subtotal INTEGER NOT NULL,
+            venue TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            event_id INTEGER,
+            is_online INTEGER NOT NULL DEFAULT 0,
+            record_type TEXT NOT NULL DEFAULT 'normal',
+            special_name TEXT,
+            group_name TEXT
+          )
+        ''');
+      },
+    );
+    await oldDb.insert('records', {
+      'date': '2026-01-01',
+      'count': 1,
+      'unit_price': 200,
+      'subtotal': 200,
+      'venue': '上海',
+      'created_at': '2026-01-01T00:00:00',
+      'event_id': 1,
+      'record_type': 'group',
+      'group_name': '旧团体',
+    });
+    await oldDb.close();
+
+    final db = await DatabaseHelper.instance.database;
+    final columns = await db.rawQuery('PRAGMA table_info(records)');
+    final records = await db.query('records');
+
+    expect(columns.any((row) => row['name'] == 'group_members'), isTrue);
+    expect(records.single['record_type'], 'group');
+    expect(records.single['group_name'], '旧团体');
+    expect(records.single['group_members'], isNull);
   });
 
   test('支出统计包含全部切奇且只累计现场门票', () async {
@@ -96,14 +155,50 @@ void main() {
     await _insertEvent(db, '电切活动', true, 80);
     await _insertIdolAndRecord(db, onsite, 300, false);
     await _insertIdolAndRecord(db, null, 200, true, suffix: '2');
+    await _insertIdolAndRecord(
+      db,
+      null,
+      90,
+      false,
+      suffix: '3',
+      recordType: ChekiRecordType.theme,
+      specialName: '新年主题',
+    );
+    await db.insert('records', {
+      'idol_id': null,
+      'date': '2026-01-01',
+      'count': 2,
+      'unit_price': 80,
+      'subtotal': 160,
+      'venue': '上海',
+      'created_at': '2026-01-01T00:00:04',
+      'event_id': onsite,
+      'is_online': 0,
+      'record_type': 'group',
+      'group_name': '团体',
+      'group_members': '偶像1、偶像2',
+    });
 
     final summary = await EventRepository().getSpendingSummary(year: '2026');
-    expect(summary.allChekiAmount, 500);
-    expect(summary.onsiteChekiAmount, 300);
+    expect(summary.allChekiAmount, 750);
+    expect(summary.onsiteChekiAmount, 550);
     expect(summary.onlineChekiAmount, 200);
+    expect(summary.normalChekiAmount, 500);
+    expect(summary.themeChekiAmount, 90);
+    expect(summary.groupChekiAmount, 160);
+    expect(
+      summary.normalChekiAmount +
+          summary.themeChekiAmount +
+          summary.groupChekiAmount,
+      summary.allChekiAmount,
+    );
+    expect(
+      summary.onsiteChekiAmount + summary.onlineChekiAmount,
+      summary.allChekiAmount,
+    );
     expect(summary.onsiteTicketAmount, 150);
     expect(summary.onsiteEventCount, 1);
-    expect(summary.totalSpending, 650);
+    expect(summary.totalSpending, 900);
   });
 
   test('编辑活动只同步仍沿用旧日期和场地的记录', () async {
@@ -180,6 +275,8 @@ Future<void> _insertIdolAndRecord(
   int subtotal,
   bool isOnline, {
   String suffix = '1',
+  ChekiRecordType recordType = ChekiRecordType.normal,
+  String? specialName,
 }) async {
   final idolId = await db.insert('idols', {
     'stable_id': 'idol_$suffix',
@@ -199,6 +296,8 @@ Future<void> _insertIdolAndRecord(
     'created_at': '2026-01-01T00:00:0$suffix',
     'event_id': eventId,
     'is_online': isOnline ? 1 : 0,
+    'record_type': recordType.value,
+    'special_name': specialName,
   });
 }
 

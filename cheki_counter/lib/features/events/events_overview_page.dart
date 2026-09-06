@@ -181,6 +181,23 @@ class _SpendingPanel extends StatelessWidget {
           label: '全部切奇费用',
           value: '¥${summary.allChekiAmount}',
         ),
+        const _SpendingSectionTitle('按类型'),
+        _SpendingItem(
+          icon: Icons.person_outline,
+          label: '普通切',
+          value: '¥${summary.normalChekiAmount}',
+        ),
+        _SpendingItem(
+          icon: Icons.celebration_outlined,
+          label: '主题切',
+          value: '¥${summary.themeChekiAmount}',
+        ),
+        _SpendingItem(
+          icon: Icons.groups_outlined,
+          label: '团切',
+          value: '¥${summary.groupChekiAmount}',
+        ),
+        const _SpendingSectionTitle('按参与方式'),
         _SpendingItem(
           icon: Icons.location_on_outlined,
           label: '现场切',
@@ -202,6 +219,20 @@ class _SpendingPanel extends StatelessWidget {
           value: '${summary.onsiteEventCount} 场',
         ),
       ],
+    );
+  }
+}
+
+class _SpendingSectionTitle extends StatelessWidget {
+  final String title;
+
+  const _SpendingSectionTitle(this.title);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
+      child: Text(title, style: Theme.of(context).textTheme.titleSmall),
     );
   }
 }

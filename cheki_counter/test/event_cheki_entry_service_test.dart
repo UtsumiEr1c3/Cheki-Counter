@@ -138,6 +138,106 @@ void main() {
     expect(records.single['is_online'], 0);
   });
 
+  test('团切关联活动并只计入团体和活动统计', () async {
+    final db = await DatabaseHelper.instance.database;
+    final idolRepo = IdolRepository();
+    final idolId = await idolRepo.insertWithFirstRecord(
+      Idol(
+        name: 'Aki',
+        color: '蓝色',
+        colorValue: colorValueForName('蓝色'),
+        groupName: 'EAUX',
+        createdAt: '2026-01-01T00:00:00',
+      ),
+      CheckiRecord(
+        idolId: 0,
+        date: '2026-01-01',
+        count: 1,
+        unitPrice: 60,
+        subtotal: 60,
+        venue: 'Shanghai',
+        createdAt: '2026-01-01T00:00:01',
+      ),
+    );
+    final event = CheckiEvent(
+      id: await db.insert('events', {
+        'stable_id': 'event_group_cheki',
+        'name': 'VoltFes',
+        'venue': 'Wuhan MAO',
+        'date': '2026-04-20',
+        'created_at': '2026-04-01T00:00:00',
+        'ticket_price': 180,
+        'is_online': 0,
+      }),
+      name: 'VoltFes',
+      venue: 'Wuhan MAO',
+      date: '2026-04-20',
+      createdAt: '2026-04-01T00:00:00',
+      ticketPrice: 180,
+    );
+
+    await EventChekiEntryService().addGroupRecord(
+      event: event,
+      groupName: 'EAUX',
+      groupMembers: 'Aki、Rin',
+      count: 2,
+      unitPrice: 80,
+      createdAt: '2026-04-20T12:00:00',
+    );
+
+    final groupRecords = await db.query(
+      'records',
+      where: "record_type = 'group'",
+    );
+    final idol = await idolRepo.findById(idolId);
+    final groups = await idolRepo.getGroupAggregates();
+    final eventRows = await RecordRepository().getByEventId(event.id!);
+
+    expect(groupRecords.single['idol_id'], isNull);
+    expect(groupRecords.single['event_id'], event.id);
+    expect(groupRecords.single['group_name'], 'EAUX');
+    expect(groupRecords.single['group_members'], 'Aki、Rin');
+    expect(idol!.totalCount, 0);
+    expect(groups.single['total_count'], 3);
+    expect(groups.single['total_amount'], 220);
+    expect(eventRows, hasLength(1));
+    expect(eventRows.single['record_type'], 'group');
+  });
+
+  test('团切可使用新团体并保存成员快照', () async {
+    final db = await DatabaseHelper.instance.database;
+    final event = CheckiEvent(
+      id: await db.insert('events', {
+        'stable_id': 'event_new_group_cheki',
+        'name': '新团首演',
+        'venue': '上海',
+        'date': '2026-05-01',
+        'created_at': '2026-05-01T00:00:00',
+        'ticket_price': 0,
+        'is_online': 0,
+      }),
+      name: '新团首演',
+      venue: '上海',
+      date: '2026-05-01',
+      createdAt: '2026-05-01T00:00:00',
+      ticketPrice: 0,
+    );
+
+    await EventChekiEntryService().addGroupRecord(
+      event: event,
+      groupName: '新团体',
+      groupMembers: ' 小桃, 小凛、小桃 ',
+      count: 1,
+      unitPrice: 200,
+      createdAt: '2026-05-01T12:00:00',
+    );
+
+    final record = (await db.query('records')).single;
+    expect(record['group_name'], '新团体');
+    expect(record['group_members'], '小桃、小凛');
+    expect(await IdolRepository().getDistinctGroupNames(), ['新团体']);
+  });
+
   test(
     'creates a new idol with a first record scoped to the current event',
     () async {

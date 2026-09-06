@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:cheki_counter/data/idol_repository.dart';
 import 'package:cheki_counter/data/models/idol.dart';
+import 'package:cheki_counter/data/models/record.dart';
 import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/features/idol_detail/edit_idol_dialog.dart';
 import 'package:cheki_counter/shared/colors.dart';
@@ -164,10 +165,34 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [Text(row.eventName!), Text(venueLine)],
                         )
+                      : r.recordType == ChekiRecordType.theme
+                      ? Text(
+                          '${r.specialName ?? r.venue} · 主题切  单价¥${r.unitPrice}',
+                        )
                       : Text(venueLine),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    onPressed: () => _confirmDelete(r.id!),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'delete') {
+                        _confirmDelete(r.id!);
+                      } else if (value == 'theme') {
+                        _markTheme(r);
+                      } else if (value == 'normal') {
+                        _repo.markNormal(r.id!).then((_) => _load());
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (!hasEvent && r.recordType == ChekiRecordType.normal)
+                        const PopupMenuItem(
+                          value: 'theme',
+                          child: Text('标记为主题切'),
+                        ),
+                      if (r.recordType == ChekiRecordType.theme)
+                        const PopupMenuItem(
+                          value: 'normal',
+                          child: Text('改回普通切'),
+                        ),
+                      const PopupMenuItem(value: 'delete', child: Text('删除')),
+                    ],
                   ),
                 );
               },
@@ -188,6 +213,43 @@ class _IdolDetailPageState extends State<IdolDetailPage> {
     if (changed == true) {
       await _load();
     }
+  }
+
+  Future<void> _markTheme(CheckiRecord record) async {
+    final controller = TextEditingController(
+      text: record.specialName ?? record.venue,
+    );
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('标记为主题切'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '主题名称',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = controller.text.trim();
+              if (value.isNotEmpty) Navigator.pop(context, value);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name == null) return;
+    await _repo.markTheme(recordId: record.id!, name: name);
+    await _load();
   }
 
   void _confirmDelete(int recordId) {

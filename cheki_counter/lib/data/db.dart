@@ -28,7 +28,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 7,
+      version: 9,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -75,7 +75,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        idol_id INTEGER NOT NULL,
+        idol_id INTEGER,
         date TEXT NOT NULL,
         count INTEGER NOT NULL,
         unit_price INTEGER NOT NULL,
@@ -84,6 +84,10 @@ class DatabaseHelper {
         created_at TEXT NOT NULL,
         event_id INTEGER,
         is_online INTEGER NOT NULL DEFAULT 0,
+        record_type TEXT NOT NULL DEFAULT 'normal',
+        special_name TEXT,
+        group_name TEXT,
+        group_members TEXT,
         FOREIGN KEY (idol_id) REFERENCES idols (id),
         FOREIGN KEY (event_id) REFERENCES events (id)
       )
@@ -179,6 +183,41 @@ class DatabaseHelper {
           WHERE r.event_id = events.id AND r.is_online = 0
         )
       ''');
+    }
+    if (oldVersion < 8) {
+      await db.execute('''
+        CREATE TABLE records_v8 (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          idol_id INTEGER,
+          date TEXT NOT NULL,
+          count INTEGER NOT NULL,
+          unit_price INTEGER NOT NULL,
+          subtotal INTEGER NOT NULL,
+          venue TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          event_id INTEGER,
+          is_online INTEGER NOT NULL DEFAULT 0,
+          record_type TEXT NOT NULL DEFAULT 'normal',
+          special_name TEXT,
+          group_name TEXT,
+          FOREIGN KEY (idol_id) REFERENCES idols (id),
+          FOREIGN KEY (event_id) REFERENCES events (id)
+        )
+      ''');
+      await db.execute('''
+        INSERT INTO records_v8 (
+          id, idol_id, date, count, unit_price, subtotal, venue,
+          created_at, event_id, is_online, record_type
+        )
+        SELECT id, idol_id, date, count, unit_price, subtotal, venue,
+               created_at, event_id, is_online, 'normal'
+        FROM records
+      ''');
+      await db.execute('DROP TABLE records');
+      await db.execute('ALTER TABLE records_v8 RENAME TO records');
+    }
+    if (oldVersion < 9) {
+      await db.execute('ALTER TABLE records ADD COLUMN group_members TEXT');
     }
   }
 

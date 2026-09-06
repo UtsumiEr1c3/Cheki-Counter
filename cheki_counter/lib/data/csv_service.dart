@@ -43,6 +43,9 @@ class CsvService {
     '应援色值',
     '活动ID',
     '活动方式',
+    '切奇类型',
+    '切奇名称',
+    '团切成员',
   ];
 
   /// Import CSV from file bytes. Merge-append semantics.
@@ -71,6 +74,9 @@ class CsvService {
     final colorValueIndex = header.indexOf('应援色值');
     final eventStableIdIndex = header.indexOf('活动ID');
     final eventModeIndex = header.indexOf('活动方式');
+    final recordTypeIndex = header.indexOf('切奇类型');
+    final specialNameIndex = header.indexOf('切奇名称');
+    final groupMembersIndex = header.indexOf('团切成员');
     final offset = hasStableIdColumn ? 1 : 0;
     if (header.length < 9 + offset) {
       result.errors = 1;
@@ -100,6 +106,24 @@ class CsvService {
         final priceVal = row.length > offset + 5 ? row[offset + 5] : '';
         final venue = col(offset + 7);
         final createdAt = col(offset + 8);
+        final rawRecordType = recordTypeIndex >= 0 ? col(recordTypeIndex) : '';
+        const supportedRecordTypes = {
+          '',
+          '普通切',
+          '主题切',
+          '团切',
+          'normal',
+          'theme',
+          'group',
+        };
+        if (!supportedRecordTypes.contains(rawRecordType)) {
+          throw FormatException('切奇类型无效: $rawRecordType');
+        }
+        final recordType = ChekiRecordType.fromCsv(rawRecordType);
+        final specialName = specialNameIndex >= 0 ? col(specialNameIndex) : '';
+        final groupMembers = groupMembersIndex >= 0
+            ? col(groupMembersIndex)
+            : '';
 
         // Event side
         final eventName = col(offset + 9);
@@ -141,12 +165,40 @@ class CsvService {
 
         // Resolve event first (shared across both sides)
         int? eventId;
-        final hasRecord =
-            name.isNotEmpty &&
+        final hasRecordFields =
             date.isNotEmpty &&
             venue.isNotEmpty &&
             countVal.toString().trim().isNotEmpty &&
             priceVal.toString().trim().isNotEmpty;
+        final hasIndividualRecord = name.isNotEmpty && hasRecordFields;
+        final hasGroupRecord =
+            recordType == ChekiRecordType.group &&
+            group.isNotEmpty &&
+            hasRecordFields;
+        final hasRecord = hasIndividualRecord || hasGroupRecord;
+
+        if (recordType == ChekiRecordType.theme) {
+          if (!hasIndividualRecord) {
+            throw const FormatException('主题切缺少偶像或切奇记录');
+          }
+          if (specialName.isEmpty) {
+            throw const FormatException('主题切缺少切奇名称');
+          }
+          if (hasEvent) {
+            throw const FormatException('主题切不能关联活动');
+          }
+        }
+        if (recordType == ChekiRecordType.group) {
+          if (!hasGroupRecord) {
+            throw const FormatException('团切缺少团体或切奇记录');
+          }
+          if (!hasEvent) {
+            throw const FormatException('团切必须关联活动');
+          }
+          if (groupMembers.isEmpty) {
+            throw const FormatException('团切缺少成员');
+          }
+        }
         final eventStableId = eventStableIdIndex >= 0
             ? col(eventStableIdIndex)
             : '';
@@ -158,7 +210,7 @@ class CsvService {
             : hasRecord && isOnline;
 
         var colorValue = colorValueForName(color);
-        if (hasRecord && colorValueIndex >= 0) {
+        if (hasIndividualRecord && colorValueIndex >= 0) {
           final rawColorValue = col(colorValueIndex);
           if (rawColorValue.isNotEmpty) {
             final parsed = tryParseColorHex(rawColorValue);
@@ -173,7 +225,7 @@ class CsvService {
             result.errors++;
             result.errorDetails.add('行$lineNum: 无法从应援色名称恢复色值,已按灰色处理');
           }
-        } else if (hasRecord && !presetColors.containsKey(color)) {
+        } else if (hasIndividualRecord && !presetColors.containsKey(color)) {
           result.errors++;
           result.errorDetails.add('行$lineNum: 无法从旧格式恢复应援色值,已按灰色处理');
         }
@@ -226,6 +278,53 @@ class CsvService {
           throw FormatException('单价无效: $priceVal');
         }
 
+        final normalizedSpecialName = recordType == ChekiRecordType.theme
+            ? specialName
+            : null;
+        final normalizedGroupName = recordType == ChekiRecordType.group
+            ? group
+            : null;
+        final normalizedGroupMembers = recordType == ChekiRecordType.group
+            ? groupMembers
+            : null;
+
+        if (recordType == ChekiRecordType.group) {
+          final exists = await _recordRepo.existsByDedupKey(
+            idolId: null,
+            date: date,
+            count: count,
+            unitPrice: unitPrice,
+            venue: venue,
+            createdAt: createdAt,
+            eventId: eventId,
+            isOnline: isOnline,
+            recordType: recordType,
+            groupName: normalizedGroupName,
+            groupMembers: normalizedGroupMembers,
+          );
+          if (exists) {
+            result.skipped++;
+          } else {
+            await _recordRepo.insert(
+              CheckiRecord(
+                date: date,
+                count: count,
+                unitPrice: unitPrice,
+                subtotal: count * unitPrice,
+                venue: venue,
+                createdAt: createdAt,
+                eventId: eventId,
+                isOnline: isOnline,
+                recordType: recordType,
+                groupName: normalizedGroupName,
+                groupMembers: normalizedGroupMembers,
+              ),
+            );
+            result.newRecords++;
+          }
+          continue;
+        }
+
         // Find or create idol
         var idol = stableId.isNotEmpty
             ? await _idolRepo.findByStableId(stableId)
@@ -250,6 +349,8 @@ class CsvService {
             createdAt: createdAt,
             eventId: eventId,
             isOnline: isOnline,
+            recordType: recordType,
+            specialName: normalizedSpecialName,
           );
           await _idolRepo.insertWithFirstRecord(idolObj, record);
           result.newIdols++;
@@ -270,6 +371,8 @@ class CsvService {
             createdAt: createdAt,
             eventId: eventId,
             isOnline: isOnline,
+            recordType: recordType,
+            specialName: normalizedSpecialName,
           );
 
           if (exists) {
@@ -285,6 +388,8 @@ class CsvService {
               createdAt: createdAt,
               eventId: eventId,
               isOnline: isOnline,
+              recordType: recordType,
+              specialName: normalizedSpecialName,
             );
             await _recordRepo.insert(record);
             result.newRecords++;
@@ -320,16 +425,19 @@ class CsvService {
     final recordRows = await db.rawQuery('''
       SELECT i.stable_id AS idol_stable_id,
              i.name AS idol_name, i.color AS idol_color,
-             i.color_value AS idol_color_value, i.group_name,
+             i.color_value AS idol_color_value,
+             i.group_name AS idol_group_name,
              r.date AS r_date, r.count, r.unit_price, r.subtotal,
              r.venue AS r_venue, r.created_at AS r_created,
              r.is_online AS r_is_online,
+             r.record_type, r.special_name, r.group_members,
+             r.group_name AS record_group_name,
              e.name AS e_name, e.venue AS e_venue, e.date AS e_date,
              e.ticket_price AS e_ticket_price, e.stable_id AS e_stable_id,
              e.is_online AS e_is_online,
              COALESCE(e.date, r.date) AS sort_date, r.id AS r_id
       FROM records r
-      JOIN idols i ON i.id = r.idol_id
+      LEFT JOIN idols i ON i.id = r.idol_id
       LEFT JOIN events e ON e.id = r.event_id
       ORDER BY sort_date DESC, r_id ASC
     ''');
@@ -372,7 +480,7 @@ class CsvService {
             d['idol_stable_id'] ?? '',
             d['idol_name'] ?? '',
             d['idol_color'] ?? '',
-            d['group_name'] ?? '',
+            d['record_group_name'] ?? d['idol_group_name'] ?? '',
             d['r_date'] ?? '',
             d['count'] ?? '',
             d['unit_price'] ?? '',
@@ -386,11 +494,16 @@ class CsvService {
             d['e_name'] == null
                 ? ''
                 : ((d['e_ticket_price'] as int?) ?? 0).toString(),
-            colorValueToHex(d['idol_color_value'] as int),
+            d['idol_color_value'] == null
+                ? ''
+                : colorValueToHex(d['idol_color_value'] as int),
             d['e_stable_id'] ?? '',
             d['e_name'] == null
                 ? ''
                 : ((d['e_is_online'] as int?) == 1 ? '电切' : '现场'),
+            ChekiRecordType.fromValue(d['record_type']).label,
+            d['special_name'] ?? '',
+            d['group_members'] ?? '',
           ];
         } else {
           return [
@@ -412,6 +525,9 @@ class CsvService {
             '',
             d['e_stable_id'] ?? '',
             (d['e_is_online'] as int?) == 1 ? '电切' : '现场',
+            '',
+            '',
+            '',
           ];
         }
       }),

@@ -26,6 +26,30 @@ class IdolRepository {
     return results.map((row) => Idol.fromMap(row)).toList();
   }
 
+  Future<List<String>> getDistinctGroupNames() async {
+    final db = await _db;
+    final rows = await db.rawQuery('''
+      SELECT group_name FROM idols WHERE group_name != ''
+      UNION
+      SELECT group_name FROM records
+      WHERE record_type = 'group' AND group_name IS NOT NULL AND group_name != ''
+      ORDER BY group_name
+    ''');
+    return rows.map((row) => row['group_name'] as String).toList();
+  }
+
+  Future<List<String>> getMemberNamesByGroup(String groupName) async {
+    final db = await _db;
+    final rows = await db.query(
+      'idols',
+      columns: ['name'],
+      where: 'group_name = ?',
+      whereArgs: [groupName],
+      orderBy: 'name ASC, id ASC',
+    );
+    return rows.map((row) => row['name'] as String).toList();
+  }
+
   /// Get all idols with aggregated count and amount.
   /// [sortBy] can be 'count' or 'amount'.
   /// [year] filters records by year (null = all).
@@ -212,7 +236,7 @@ class IdolRepository {
     final where = year == null ? '' : "WHERE strftime('%Y', r.date) = ?";
     final args = year == null ? <Object?>[] : <Object?>[year];
 
-    return await db.rawQuery('''
+    final idolRows = await db.rawQuery('''
       SELECT i.group_name,
              COUNT(DISTINCT i.id) AS idol_count,
              SUM(r.count) AS total_count,
@@ -221,8 +245,56 @@ class IdolRepository {
       INNER JOIN records r ON r.idol_id = i.id
       $where
       GROUP BY i.group_name
-      ORDER BY total_count DESC
     ''', args);
+
+    final groupConditions = <String>[
+      "record_type = 'group'",
+      "group_name IS NOT NULL",
+    ];
+    final groupArgs = <Object?>[];
+    if (year != null) {
+      groupConditions.add("strftime('%Y', date) = ?");
+      groupArgs.add(year);
+    }
+    final groupRows = await db.rawQuery('''
+      SELECT group_name, SUM(count) AS total_count,
+             SUM(subtotal) AS total_amount
+      FROM records
+      WHERE ${groupConditions.join(' AND ')}
+      GROUP BY group_name
+    ''', groupArgs);
+
+    final merged = <String, Map<String, dynamic>>{};
+    for (final row in idolRows) {
+      merged[row['group_name'] as String] = {
+        'group_name': row['group_name'],
+        'idol_count': (row['idol_count'] as num).toInt(),
+        'total_count': (row['total_count'] as num).toInt(),
+        'total_amount': (row['total_amount'] as num).toInt(),
+      };
+    }
+    for (final row in groupRows) {
+      final name = row['group_name'] as String;
+      final target = merged.putIfAbsent(
+        name,
+        () => {
+          'group_name': name,
+          'idol_count': 0,
+          'total_count': 0,
+          'total_amount': 0,
+        },
+      );
+      target['total_count'] =
+          (target['total_count'] as int) + (row['total_count'] as num).toInt();
+      target['total_amount'] =
+          (target['total_amount'] as int) +
+          (row['total_amount'] as num).toInt();
+    }
+    final result = merged.values.toList();
+    result.sort(
+      (a, b) => (b['total_count'] as int).compareTo(a['total_count'] as int),
+    );
+    return result;
   }
 }
 

@@ -34,12 +34,14 @@ class RecordRepository {
       );
       if (record.isEmpty) return;
 
-      final idolId = record.first['idol_id'] as int;
+      final idolId = record.first['idol_id'] as int?;
 
       // Delete the record
       await txn.delete('records', where: 'id = ?', whereArgs: [recordId]);
 
-      // Check if idol has remaining records
+      if (idolId == null) return;
+
+      // 检查偶像是否仍有记录
       final remaining = Sqflite.firstIntValue(
         await txn.rawQuery('SELECT COUNT(*) FROM records WHERE idol_id = ?', [
           idolId,
@@ -63,6 +65,7 @@ class RecordRepository {
       '''
       SELECT r.id, r.idol_id, r.date, r.count, r.unit_price, r.subtotal,
              r.venue, r.created_at, r.event_id, r.is_online,
+             r.record_type, r.special_name, r.group_name, r.group_members,
              e.name AS event_name
       FROM records r
       LEFT JOIN events e ON e.id = r.event_id
@@ -87,13 +90,15 @@ class RecordRepository {
     return await db.rawQuery(
       '''
       SELECT r.id, r.idol_id, r.date, r.count, r.unit_price, r.subtotal,
-             r.venue, r.created_at, r.event_id,
+             r.venue, r.created_at, r.event_id, r.is_online,
+             r.record_type, r.special_name, r.group_name, r.group_members,
              i.name AS idol_name, i.color AS idol_color,
-             i.color_value AS idol_color_value, i.group_name
+             i.color_value AS idol_color_value,
+             i.group_name AS idol_group_name
       FROM records r
-      JOIN idols i ON i.id = r.idol_id
+      LEFT JOIN idols i ON i.id = r.idol_id
       WHERE r.event_id = ?
-      ORDER BY i.name ASC, r.created_at DESC
+      ORDER BY COALESCE(i.name, r.group_name) ASC, r.created_at DESC
     ''',
       [eventId],
     );
@@ -150,6 +155,71 @@ class RecordRepository {
     return results.map((r) => r['year'] as String).toList();
   }
 
+  Future<Map<String, int>> getGroupChekiAggregate(
+    String groupName, {
+    String? year,
+  }) async {
+    final db = await _db;
+    final conditions = <String>["record_type = 'group'", 'group_name = ?'];
+    final args = <Object?>[groupName];
+    if (year != null) {
+      conditions.add("strftime('%Y', date) = ?");
+      args.add(year);
+    }
+    final rows = await db.rawQuery('''
+      SELECT COALESCE(SUM(count), 0) AS total_count,
+             COALESCE(SUM(subtotal), 0) AS total_amount
+      FROM records
+      WHERE ${conditions.join(' AND ')}
+    ''', args);
+    final row = rows.single;
+    return {
+      'total_count': (row['total_count'] as num).toInt(),
+      'total_amount': (row['total_amount'] as num).toInt(),
+    };
+  }
+
+  Future<Map<String, int>> getAllGroupChekiAggregate({String? year}) async {
+    final db = await _db;
+    final conditions = <String>["record_type = 'group'"];
+    final args = <Object?>[];
+    if (year != null) {
+      conditions.add("strftime('%Y', date) = ?");
+      args.add(year);
+    }
+    final rows = await db.rawQuery('''
+      SELECT COALESCE(SUM(count), 0) AS total_count,
+             COALESCE(SUM(subtotal), 0) AS total_amount
+      FROM records
+      WHERE ${conditions.join(' AND ')}
+    ''', args);
+    final row = rows.single;
+    return {
+      'total_count': (row['total_count'] as num).toInt(),
+      'total_amount': (row['total_amount'] as num).toInt(),
+    };
+  }
+
+  Future<void> markTheme({required int recordId, required String name}) async {
+    final db = await _db;
+    await db.update(
+      'records',
+      {'record_type': 'theme', 'special_name': name.trim()},
+      where: "id = ? AND idol_id IS NOT NULL AND event_id IS NULL",
+      whereArgs: [recordId],
+    );
+  }
+
+  Future<void> markNormal(int recordId) async {
+    final db = await _db;
+    await db.update(
+      'records',
+      {'record_type': 'normal', 'special_name': null},
+      where: "id = ? AND idol_id IS NOT NULL",
+      whereArgs: [recordId],
+    );
+  }
+
   /// Get distinct venues across records and events, case-folded to drop
   /// near-duplicates. For each lowercase group, returns the venue whose
   /// source row has the most recent `created_at`. Ordered by that
@@ -196,7 +266,7 @@ class RecordRepository {
   /// Check if a record with the exact dedup key already exists.
   /// `eventId` may be null; NULL equality is matched via IS.
   Future<bool> existsByDedupKey({
-    required int idolId,
+    int? idolId,
     required String date,
     required int count,
     required int unitPrice,
@@ -204,19 +274,29 @@ class RecordRepository {
     required String createdAt,
     int? eventId,
     required bool isOnline,
+    ChekiRecordType recordType = ChekiRecordType.normal,
+    String? specialName,
+    String? groupName,
+    String? groupMembers,
     DatabaseExecutor? executor,
   }) async {
     final db = executor ?? await _db;
     final result = await db.rawQuery(
       '''
       SELECT 1 FROM records
-      WHERE idol_id = ? AND date = ? AND count = ?
+      WHERE ((idol_id IS NULL AND ? IS NULL) OR idol_id = ?)
+        AND date = ? AND count = ?
         AND unit_price = ? AND venue = ? AND created_at = ?
         AND ((event_id IS NULL AND ? IS NULL) OR event_id = ?)
         AND is_online = ?
+        AND record_type = ?
+        AND ((special_name IS NULL AND ? IS NULL) OR special_name = ?)
+        AND ((group_name IS NULL AND ? IS NULL) OR group_name = ?)
+        AND ((group_members IS NULL AND ? IS NULL) OR group_members = ?)
       LIMIT 1
     ''',
       [
+        idolId,
         idolId,
         date,
         count,
@@ -226,6 +306,13 @@ class RecordRepository {
         eventId,
         eventId,
         isOnline ? 1 : 0,
+        recordType.value,
+        specialName,
+        specialName,
+        groupName,
+        groupName,
+        groupMembers,
+        groupMembers,
       ],
     );
     return result.isNotEmpty;

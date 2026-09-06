@@ -22,11 +22,15 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   List<String> _years = [];
   late String? _selectedYear;
   String _sortBy = 'count';
+  int _groupChekiCount = 0;
+  int _groupChekiAmount = 0;
 
   int get _totalCount =>
-      _idols.fold<int>(0, (sum, idol) => sum + idol.totalCount);
+      _idols.fold<int>(0, (sum, idol) => sum + idol.totalCount) +
+      _groupChekiCount;
   int get _totalAmount =>
-      _idols.fold<int>(0, (sum, idol) => sum + idol.totalAmount);
+      _idols.fold<int>(0, (sum, idol) => sum + idol.totalAmount) +
+      _groupChekiAmount;
 
   @override
   void initState() {
@@ -47,7 +51,17 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
       sortBy: _sortBy,
       year: _selectedYear,
     );
-    if (mounted) setState(() => _idols = idols);
+    final groupCheki = await _recordRepo.getGroupChekiAggregate(
+      widget.groupName,
+      year: _selectedYear,
+    );
+    if (mounted) {
+      setState(() {
+        _idols = idols;
+        _groupChekiCount = groupCheki['total_count']!;
+        _groupChekiAmount = groupCheki['total_amount']!;
+      });
+    }
   }
 
   @override
@@ -60,15 +74,38 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
           _buildSummary(context),
           const Divider(height: 1),
           Expanded(
-            child: _idols.isEmpty
+            child: _idols.isEmpty && _groupChekiCount == 0
                 ? const Center(child: Text('当前筛选下暂无数据'))
                 : ListView.builder(
-                    itemCount: _idols.length,
+                    itemCount: _idols.length + (_groupChekiCount > 0 ? 1 : 0),
                     itemBuilder: (context, index) {
-                      return _buildIdolTile(_idols[index]);
+                      if (_groupChekiCount > 0 && index == 0) {
+                        return _buildGroupChekiTile();
+                      }
+                      final idolIndex = index - (_groupChekiCount > 0 ? 1 : 0);
+                      return _buildIdolTile(_idols[idolIndex]);
                     },
                   ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupChekiTile() {
+    return ListTile(
+      leading: const CircleAvatar(child: Icon(Icons.groups_outlined)),
+      title: const Text('团切'),
+      subtitle: Text('${widget.groupName}共同拍摄'),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            '$_groupChekiCount 切',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          Text('¥$_groupChekiAmount'),
         ],
       ),
     );

@@ -4,6 +4,7 @@ import 'package:cheki_counter/features/home/idol_list_notifier.dart';
 import 'package:cheki_counter/features/home/idol_card.dart';
 import 'package:cheki_counter/features/home/add_idol_dialog.dart';
 import 'package:cheki_counter/features/home/add_record_dialog.dart';
+import 'package:cheki_counter/features/home/add_theme_cheki_dialog.dart';
 import 'package:cheki_counter/features/events/add_event_dialog.dart';
 import 'package:cheki_counter/features/events/events_overview_page.dart';
 
@@ -180,6 +181,11 @@ class _HomePageState extends State<HomePage> {
               title: const Text('新建活动(无偶像)'),
               onTap: () => Navigator.pop(ctx, 'event'),
             ),
+            ListTile(
+              leading: const Icon(Icons.celebration_outlined),
+              title: const Text('添加主题切'),
+              onTap: () => Navigator.pop(ctx, 'theme'),
+            ),
           ],
         ),
       ),
@@ -193,6 +199,11 @@ class _HomePageState extends State<HomePage> {
       await showDialog(
         context: context,
         builder: (_) => const AddEventDialog(),
+      );
+    } else if (choice == 'theme') {
+      await showDialog(
+        context: context,
+        builder: (_) => const AddThemeChekiDialog(),
       );
     }
 

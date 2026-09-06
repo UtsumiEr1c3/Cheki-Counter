@@ -28,12 +28,14 @@ class IdolSummaryEntry {
   final String color;
   final int colorValue;
   final int count;
+  final bool isGroup;
 
   IdolSummaryEntry({
     required this.name,
     required this.color,
     required this.colorValue,
     required this.count,
+    this.isGroup = false,
   });
 }
 
@@ -43,6 +45,9 @@ class EventSpendingSummary {
   final int onlineChekiAmount;
   final int onsiteTicketAmount;
   final int onsiteEventCount;
+  final int normalChekiAmount;
+  final int themeChekiAmount;
+  final int groupChekiAmount;
 
   const EventSpendingSummary({
     required this.allChekiAmount,
@@ -50,6 +55,9 @@ class EventSpendingSummary {
     required this.onlineChekiAmount,
     required this.onsiteTicketAmount,
     required this.onsiteEventCount,
+    required this.normalChekiAmount,
+    required this.themeChekiAmount,
+    required this.groupChekiAmount,
   });
 
   int get totalSpending => allChekiAmount + onsiteTicketAmount;
@@ -211,7 +219,13 @@ class EventRepository {
              COALESCE(SUM(CASE WHEN is_online = 0 THEN subtotal ELSE 0 END), 0)
                AS onsite_cheki,
              COALESCE(SUM(CASE WHEN is_online = 1 THEN subtotal ELSE 0 END), 0)
-               AS online_cheki
+               AS online_cheki,
+             COALESCE(SUM(CASE WHEN record_type = 'normal' THEN subtotal ELSE 0 END), 0)
+               AS normal_cheki,
+             COALESCE(SUM(CASE WHEN record_type = 'theme' THEN subtotal ELSE 0 END), 0)
+               AS theme_cheki,
+             COALESCE(SUM(CASE WHEN record_type = 'group' THEN subtotal ELSE 0 END), 0)
+               AS group_cheki
       FROM records
       $recordWhere
     ''', recordArgs);
@@ -237,6 +251,9 @@ class EventRepository {
       onlineChekiAmount: (record['online_cheki'] as num).toInt(),
       onsiteTicketAmount: (event['onsite_tickets'] as num).toInt(),
       onsiteEventCount: (event['onsite_events'] as num).toInt(),
+      normalChekiAmount: (record['normal_cheki'] as num).toInt(),
+      themeChekiAmount: (record['theme_cheki'] as num).toInt(),
+      groupChekiAmount: (record['group_cheki'] as num).toInt(),
     );
   }
 
@@ -287,6 +304,17 @@ class EventRepository {
       ORDER BY cnt DESC, i.name ASC
     ''', ids);
 
+    final groupRows = await db.rawQuery('''
+      SELECT r.event_id, r.group_name, SUM(r.count) AS cnt
+      FROM records r
+      JOIN events e ON e.id = r.event_id
+      WHERE r.event_id IN ($placeholders)
+        AND r.record_type = 'group'
+        AND r.is_online = e.is_online
+      GROUP BY r.event_id, r.group_name
+      ORDER BY cnt DESC, r.group_name ASC
+    ''', ids);
+
     final byEvent = <int, List<IdolSummaryEntry>>{};
     for (final row in idolRows) {
       final eid = row['event_id'] as int;
@@ -298,6 +326,20 @@ class EventRepository {
               color: row['color'] as String,
               colorValue: row['color_value'] as int,
               count: (row['cnt'] as num).toInt(),
+            ),
+          );
+    }
+    for (final row in groupRows) {
+      final eid = row['event_id'] as int;
+      byEvent
+          .putIfAbsent(eid, () => [])
+          .add(
+            IdolSummaryEntry(
+              name: '${row['group_name']}团切',
+              color: '',
+              colorValue: 0,
+              count: (row['cnt'] as num).toInt(),
+              isGroup: true,
             ),
           );
     }

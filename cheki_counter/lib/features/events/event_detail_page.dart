@@ -3,6 +3,7 @@ import 'package:cheki_counter/data/event_repository.dart';
 import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/data/models/event.dart';
 import 'package:cheki_counter/features/events/event_cheki_dialog.dart';
+import 'package:cheki_counter/features/events/event_group_cheki_dialog.dart';
 import 'package:cheki_counter/features/events/edit_event_dialog.dart';
 import 'package:cheki_counter/shared/colors.dart';
 
@@ -41,9 +42,32 @@ class _EventDetailPageState extends State<EventDetailPage> {
   }
 
   Future<void> _openAddCheki(CheckiEvent event) async {
+    final type = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.person_add_alt),
+              title: const Text('添加个人切'),
+              onTap: () => Navigator.pop(context, 'idol'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.groups_outlined),
+              title: const Text('添加团切'),
+              onTap: () => Navigator.pop(context, 'group'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || type == null) return;
     final added = await showDialog<bool>(
       context: context,
-      builder: (_) => EventChekiDialog(event: event),
+      builder: (_) => type == 'group'
+          ? EventGroupChekiDialog(event: event)
+          : EventChekiDialog(event: event),
     );
     if (added == true && mounted) {
       await _load();
@@ -71,10 +95,11 @@ class _EventDetailPageState extends State<EventDetailPage> {
       );
     }
 
-    final grouped = <int, List<Map<String, dynamic>>>{};
+    final grouped = <String, List<Map<String, dynamic>>>{};
     for (final r in _records) {
-      final idolId = r['idol_id'] as int;
-      grouped.putIfAbsent(idolId, () => []).add(r);
+      final isGroup = r['record_type'] == 'group';
+      final key = isGroup ? 'group:${r['group_name']}' : 'idol:${r['idol_id']}';
+      grouped.putIfAbsent(key, () => []).add(r);
     }
 
     final totalCount = _records.fold<int>(0, (s, r) => s + (r['count'] as int));
@@ -142,8 +167,11 @@ class _EventDetailPageState extends State<EventDetailPage> {
             ...grouped.entries.map((entry) {
               final rows = entry.value;
               final first = rows.first;
-              final idolName = first['idol_name'] as String;
-              final idolColorValue = first['idol_color_value'] as int;
+              final isGroup = first['record_type'] == 'group';
+              final subjectName = isGroup
+                  ? '${first['group_name']}团切'
+                  : first['idol_name'] as String;
+              final idolColorValue = first['idol_color_value'] as int?;
               final groupCount = rows.fold<int>(
                 0,
                 (s, r) => s + (r['count'] as int),
@@ -155,17 +183,20 @@ class _EventDetailPageState extends State<EventDetailPage> {
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                     child: Row(
                       children: [
-                        Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: colorFromValue(idolColorValue),
-                            shape: BoxShape.circle,
+                        if (isGroup)
+                          const Icon(Icons.groups_outlined, size: 18)
+                        else
+                          Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: colorFromValue(idolColorValue!),
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
                         const SizedBox(width: 8),
                         Text(
-                          '$idolName ×$groupCount',
+                          '$subjectName ×$groupCount',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -178,7 +209,12 @@ class _EventDetailPageState extends State<EventDetailPage> {
                     (r) => ListTile(
                       dense: true,
                       title: Text('${r['count']} 切 · ¥${r['subtotal']}'),
-                      subtitle: Text('${r['venue']}  单价¥${r['unit_price']}'),
+                      subtitle: Text(
+                        isGroup
+                            ? '${r['venue']}  单价¥${r['unit_price']}\n成员：${r['group_members']}'
+                            : '${r['venue']}  单价¥${r['unit_price']}',
+                      ),
+                      isThreeLine: isGroup,
                     ),
                   ),
                 ],
