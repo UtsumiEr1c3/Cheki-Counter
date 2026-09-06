@@ -214,3 +214,16 @@ TBD - created by archiving change add-cheki-counter. Update Purpose after archiv
 - **WHEN** 旧数据库包含应援色名称为 `星空色` 且旧 schema 没有实际色值
 - **THEN** 系统 SHALL 保留名称 `星空色`、回填固定灰色，并完成升级而不删除该偶像或其记录
 
+### Requirement: 新建偶像首条切奇允许零元
+
+首页和活动详情的新建偶像路径 SHALL 保持切奇数量为正整数，并接受单价为 0 的非负整数首条切奇记录。
+
+#### Scenario: 首页新建偶像附带零元切奇
+
+- **WHEN** 用户填写完整偶像资料、数量 `1`、单价 `0` 和其它必填字段后提交
+- **THEN** 系统 SHALL 创建偶像及其 `unit_price = 0`、`subtotal = 0` 的首条记录
+
+#### Scenario: 活动详情新建偶像附带零元切奇
+
+- **WHEN** 用户从活动详情新建偶像并填写数量 `1`、单价 `0`
+- **THEN** 系统 SHALL 创建偶像及关联当前活动的零元首条记录

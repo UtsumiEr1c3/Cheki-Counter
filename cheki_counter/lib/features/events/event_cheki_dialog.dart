@@ -275,7 +275,7 @@ class _EventChekiDialogState extends State<EventChekiDialog> {
             border: OutlineInputBorder(),
           ),
           keyboardType: TextInputType.number,
-          validator: _positiveIntValidator,
+          validator: _nonNegativeIntValidator,
         ),
       ],
     );
@@ -284,6 +284,12 @@ class _EventChekiDialogState extends State<EventChekiDialog> {
   String? _positiveIntValidator(String? value) {
     final number = int.tryParse(value?.trim() ?? '');
     if (number == null || number <= 0) return '请输入正整数';
+    return null;
+  }
+
+  String? _nonNegativeIntValidator(String? value) {
+    final number = int.tryParse(value?.trim() ?? '');
+    if (number == null || number < 0) return '请输入非负整数';
     return null;
   }
 }

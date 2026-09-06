@@ -274,7 +274,7 @@ class CsvService {
         final unitPrice = priceVal is num
             ? priceVal.toInt()
             : int.tryParse(priceVal.toString().trim());
-        if (unitPrice == null || unitPrice <= 0) {
+        if (unitPrice == null || unitPrice < 0) {
           throw FormatException('单价无效: $priceVal');
         }
 

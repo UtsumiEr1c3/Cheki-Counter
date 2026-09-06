@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cheki_counter/data/event_repository.dart';
+import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/features/events/event_card.dart';
 import 'package:cheki_counter/features/events/event_detail_page.dart';
+import 'package:cheki_counter/features/events/spending_records_page.dart';
 
 class EventsOverviewPage extends StatefulWidget {
   const EventsOverviewPage({super.key});
@@ -139,7 +141,10 @@ class _EventsOverviewPageState extends State<EventsOverviewPage> {
                       ),
                     ],
                   ),
-                  _SpendingPanel(summary: _spending!),
+                  SpendingPanel(
+                    summary: _spending!,
+                    selectedYear: _selectedYear,
+                  ),
                 ],
               ),
       ),
@@ -147,10 +152,31 @@ class _EventsOverviewPageState extends State<EventsOverviewPage> {
   }
 }
 
-class _SpendingPanel extends StatelessWidget {
+class SpendingPanel extends StatelessWidget {
   final EventSpendingSummary summary;
+  final String? selectedYear;
+  final ValueChanged<SpendingRecordFilter>? onOpenRecords;
 
-  const _SpendingPanel({required this.summary});
+  const SpendingPanel({
+    super.key,
+    required this.summary,
+    required this.selectedYear,
+    this.onOpenRecords,
+  });
+
+  void _openRecords(BuildContext context, SpendingRecordFilter filter) {
+    final callback = onOpenRecords;
+    if (callback != null) {
+      callback(filter);
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SpendingRecordsPage(filter: filter, year: selectedYear),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -180,33 +206,39 @@ class _SpendingPanel extends StatelessWidget {
           icon: Icons.photo_camera_outlined,
           label: '全部切奇费用',
           value: '¥${summary.allChekiAmount}',
+          onTap: () => _openRecords(context, SpendingRecordFilter.all),
         ),
         const _SpendingSectionTitle('按类型'),
         _SpendingItem(
           icon: Icons.person_outline,
           label: '普通切',
           value: '¥${summary.normalChekiAmount}',
+          onTap: () => _openRecords(context, SpendingRecordFilter.normal),
         ),
         _SpendingItem(
           icon: Icons.celebration_outlined,
           label: '主题切',
           value: '¥${summary.themeChekiAmount}',
+          onTap: () => _openRecords(context, SpendingRecordFilter.theme),
         ),
         _SpendingItem(
           icon: Icons.groups_outlined,
           label: '团切',
           value: '¥${summary.groupChekiAmount}',
+          onTap: () => _openRecords(context, SpendingRecordFilter.group),
         ),
         const _SpendingSectionTitle('按参与方式'),
         _SpendingItem(
           icon: Icons.location_on_outlined,
           label: '现场切',
           value: '¥${summary.onsiteChekiAmount}',
+          onTap: () => _openRecords(context, SpendingRecordFilter.onsite),
         ),
         _SpendingItem(
           icon: Icons.phone_outlined,
           label: '电切',
           value: '¥${summary.onlineChekiAmount}',
+          onTap: () => _openRecords(context, SpendingRecordFilter.online),
         ),
         _SpendingItem(
           icon: Icons.confirmation_number_outlined,
@@ -241,11 +273,13 @@ class _SpendingItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   const _SpendingItem({
     required this.icon,
     required this.label,
     required this.value,
+    this.onTap,
   });
 
   @override
@@ -254,10 +288,20 @@ class _SpendingItem extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon),
         title: Text(label),
-        trailing: Text(
-          value,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            ),
+            if (onTap != null) ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right),
+            ],
+          ],
         ),
+        onTap: onTap,
       ),
     );
   }

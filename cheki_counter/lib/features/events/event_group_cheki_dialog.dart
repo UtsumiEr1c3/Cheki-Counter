@@ -71,6 +71,11 @@ class _EventGroupChekiDialogState extends State<EventGroupChekiDialog> {
     return number == null || number <= 0 ? '请输入正整数' : null;
   }
 
+  String? _nonNegativeInt(String? value) {
+    final number = int.tryParse(value?.trim() ?? '');
+    return number == null || number < 0 ? '请输入非负整数' : null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -116,7 +121,8 @@ class _EventGroupChekiDialogState extends State<EventGroupChekiDialog> {
                           border: OutlineInputBorder(),
                         ),
                         onChanged: (value) => _group = value,
-                        validator: (value) => value == null || value.trim().isEmpty
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
                             ? '请输入团体'
                             : null,
                       );
@@ -132,9 +138,8 @@ class _EventGroupChekiDialogState extends State<EventGroupChekiDialog> {
                 ),
                 minLines: 1,
                 maxLines: 3,
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? '请输入当时成员'
-                    : null,
+                validator: (value) =>
+                    value == null || value.trim().isEmpty ? '请输入当时成员' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -154,7 +159,7 @@ class _EventGroupChekiDialogState extends State<EventGroupChekiDialog> {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
-                validator: _positiveInt,
+                validator: _nonNegativeInt,
               ),
             ],
           ),

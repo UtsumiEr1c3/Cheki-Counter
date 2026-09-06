@@ -7,8 +7,11 @@ import 'package:cheki_counter/data/event_repository.dart';
 import 'package:cheki_counter/data/idol_repository.dart';
 import 'package:cheki_counter/data/models/idol.dart';
 import 'package:cheki_counter/data/models/event.dart';
+import 'package:cheki_counter/data/models/record.dart';
+import 'package:cheki_counter/data/record_repository.dart';
 import 'package:cheki_counter/features/events/event_card.dart';
 import 'package:cheki_counter/features/events/events_overview_page.dart';
+import 'package:cheki_counter/features/events/spending_records_page.dart';
 import 'package:cheki_counter/features/idol_detail/edit_idol_dialog.dart';
 import 'package:cheki_counter/features/statistics/group_detail_page.dart';
 import 'package:cheki_counter/shared/colors.dart';
@@ -649,6 +652,64 @@ void main() {
 
     expect(page.groupName, 'EAUX');
     expect(page.initialYear, '2026');
+  });
+  testWidgets('支出主题切条目传递正确的明细筛选条件', (tester) async {
+    SpendingRecordFilter? openedFilter;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SpendingPanel(
+            summary: const EventSpendingSummary(
+              allChekiAmount: 0,
+              onsiteChekiAmount: 0,
+              onlineChekiAmount: 0,
+              onsiteTicketAmount: 0,
+              onsiteEventCount: 0,
+              normalChekiAmount: 0,
+              themeChekiAmount: 0,
+              groupChekiAmount: 0,
+            ),
+            selectedYear: '2026',
+            onOpenRecords: (filter) => openedFilter = filter,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('主题切'));
+    expect(openedFilter, SpendingRecordFilter.theme);
+  });
+
+  testWidgets('主题切支出明细行以偶像名为标题并显示主题名', (tester) async {
+    var tapped = false;
+    final row = SpendingRecordRow(
+      record: CheckiRecord(
+        id: 1,
+        idolId: 2,
+        date: '2026-01-02',
+        count: 1,
+        unitPrice: 0,
+        subtotal: 0,
+        venue: '新年主题',
+        createdAt: '2026-01-02T00:00:00',
+        recordType: ChekiRecordType.theme,
+        specialName: '新年主题',
+      ),
+      idolName: '凛',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SpendingRecordTile(row: row, onTap: () => tapped = true),
+        ),
+      ),
+    );
+
+    expect(find.text('凛'), findsOneWidget);
+    expect(find.textContaining('主题：新年主题'), findsOneWidget);
+    expect(find.text('¥0'), findsOneWidget);
+    await tester.tap(find.text('凛'));
+    expect(tapped, isTrue);
   });
 }
 

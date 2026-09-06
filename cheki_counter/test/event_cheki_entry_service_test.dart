@@ -138,6 +138,80 @@ void main() {
     expect(records.single['is_online'], 0);
   });
 
+  test('活动个人切、新偶像首切和团切均接受零元单价', () async {
+    final db = await DatabaseHelper.instance.database;
+    final idolRepo = IdolRepository();
+    final idolId = await idolRepo.insertWithFirstRecord(
+      Idol(
+        name: 'Aki',
+        color: '蓝色',
+        colorValue: colorValueForName('蓝色'),
+        groupName: 'EAUX',
+        createdAt: '2026-01-01T00:00:00',
+      ),
+      CheckiRecord(
+        idolId: 0,
+        date: '2026-01-01',
+        count: 1,
+        unitPrice: 60,
+        subtotal: 60,
+        venue: 'Shanghai',
+        createdAt: '2026-01-01T00:00:01',
+      ),
+    );
+    final event = CheckiEvent(
+      id: await db.insert('events', {
+        'stable_id': 'event_free_cheki',
+        'name': '赠送切活动',
+        'venue': 'Wuhan MAO',
+        'date': '2026-04-20',
+        'created_at': '2026-04-01T00:00:00',
+        'ticket_price': 0,
+        'is_online': 0,
+      }),
+      name: '赠送切活动',
+      venue: 'Wuhan MAO',
+      date: '2026-04-20',
+      createdAt: '2026-04-01T00:00:00',
+    );
+    final service = EventChekiEntryService();
+
+    await service.addExistingIdolRecord(
+      event: event,
+      idol: (await idolRepo.findById(idolId))!,
+      count: 1,
+      unitPrice: 0,
+      createdAt: '2026-04-20T12:00:00',
+    );
+    await service.createIdolWithEventRecord(
+      event: event,
+      name: 'Rin',
+      color: '红色',
+      colorValue: colorValueForName('红色'),
+      groupName: 'EAUX',
+      count: 1,
+      unitPrice: 0,
+      createdAt: '2026-04-20T12:01:00',
+    );
+    await service.addGroupRecord(
+      event: event,
+      groupName: 'EAUX',
+      groupMembers: 'Aki、Rin',
+      count: 1,
+      unitPrice: 0,
+      createdAt: '2026-04-20T12:02:00',
+    );
+
+    final records = await db.query(
+      'records',
+      where: 'event_id = ?',
+      whereArgs: [event.id],
+    );
+    expect(records, hasLength(3));
+    expect(records.every((row) => row['unit_price'] == 0), isTrue);
+    expect(records.every((row) => row['subtotal'] == 0), isTrue);
+  });
+
   test('团切关联活动并只计入团体和活动统计', () async {
     final db = await DatabaseHelper.instance.database;
     final idolRepo = IdolRepository();

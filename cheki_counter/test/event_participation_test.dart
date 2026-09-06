@@ -5,6 +5,7 @@ import 'package:cheki_counter/data/db.dart';
 import 'package:cheki_counter/data/event_repository.dart';
 import 'package:cheki_counter/data/models/event.dart';
 import 'package:cheki_counter/data/models/record.dart';
+import 'package:cheki_counter/data/record_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -95,10 +96,7 @@ void main() {
       recordColumns.singleWhere((row) => row['name'] == 'idol_id')['notnull'],
       0,
     );
-    expect(
-      recordColumns.any((row) => row['name'] == 'group_members'),
-      isTrue,
-    );
+    expect(recordColumns.any((row) => row['name'] == 'group_members'), isTrue);
     expect(migratedRecords.single['record_type'], 'normal');
   });
 
@@ -199,6 +197,59 @@ void main() {
     expect(summary.onsiteTicketAmount, 150);
     expect(summary.onsiteEventCount, 1);
     expect(summary.totalSpending, 900);
+  });
+
+  test('支出明细按年份、类型和参与方式筛选并保留零元记录', () async {
+    final db = await DatabaseHelper.instance.database;
+    final onsite = await _insertEvent(db, '现场活动', false, 0);
+    await _insertIdolAndRecord(db, onsite, 0, false);
+    await _insertIdolAndRecord(
+      db,
+      null,
+      80,
+      true,
+      suffix: '2',
+      recordType: ChekiRecordType.theme,
+      specialName: '线上主题',
+    );
+    final repo = RecordRepository();
+
+    final all = await repo.listForSpending(year: '2026');
+    final themes = await repo.listForSpending(
+      year: '2026',
+      filter: SpendingRecordFilter.theme,
+    );
+    final onsiteRecords = await repo.listForSpending(
+      year: '2026',
+      filter: SpendingRecordFilter.onsite,
+    );
+    final onlineRecords = await repo.listForSpending(
+      year: '2025',
+      filter: SpendingRecordFilter.online,
+    );
+
+    expect(all, hasLength(2));
+    expect(all.any((row) => row.record.subtotal == 0), isTrue);
+    expect(themes.single.record.recordType, ChekiRecordType.theme);
+    expect(themes.single.idolName, '偶像2');
+    expect(onsiteRecords.single.eventName, '现场活动');
+    expect(onlineRecords, isEmpty);
+  });
+
+  test('CSV 导入接受零元切奇单价', () async {
+    final result = await CsvService().importCsv(
+      utf8.encode(
+        '偶像名,应援色,团体,日期,数量,单价,小计,场地,创建时间\n'
+        '免费切偶像,蓝色,EAUX,2026-01-01,2,0,0,上海,2026-01-01T00:00:00',
+      ),
+    );
+    final db = await DatabaseHelper.instance.database;
+    final records = await db.query('records');
+
+    expect(result.errors, 0);
+    expect(result.newRecords, 1);
+    expect(records.single['unit_price'], 0);
+    expect(records.single['subtotal'], 0);
   });
 
   test('编辑活动只同步仍沿用旧日期和场地的记录', () async {

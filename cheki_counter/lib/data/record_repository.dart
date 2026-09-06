@@ -9,6 +9,24 @@ class IdolRecordRow {
   IdolRecordRow({required this.record, this.eventName});
 }
 
+enum SpendingRecordFilter { all, normal, theme, group, onsite, online }
+
+class SpendingRecordRow {
+  final CheckiRecord record;
+  final String? idolName;
+  final String? idolColor;
+  final int? idolColorValue;
+  final String? eventName;
+
+  const SpendingRecordRow({
+    required this.record,
+    this.idolName,
+    this.idolColor,
+    this.idolColorValue,
+    this.eventName,
+  });
+}
+
 class RecordRepository {
   Future<Database> get _db => DatabaseHelper.instance.database;
 
@@ -78,6 +96,59 @@ class RecordRepository {
         .map(
           (row) => IdolRecordRow(
             record: CheckiRecord.fromMap(row),
+            eventName: row['event_name'] as String?,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<SpendingRecordRow>> listForSpending({
+    String? year,
+    SpendingRecordFilter filter = SpendingRecordFilter.all,
+  }) async {
+    final db = await _db;
+    final conditions = <String>[];
+    final args = <Object?>[];
+    if (year != null) {
+      conditions.add("strftime('%Y', r.date) = ?");
+      args.add(year);
+    }
+    switch (filter) {
+      case SpendingRecordFilter.all:
+        break;
+      case SpendingRecordFilter.normal:
+      case SpendingRecordFilter.theme:
+      case SpendingRecordFilter.group:
+        conditions.add('r.record_type = ?');
+        args.add(filter.name);
+        break;
+      case SpendingRecordFilter.onsite:
+        conditions.add('r.is_online = 0');
+        break;
+      case SpendingRecordFilter.online:
+        conditions.add('r.is_online = 1');
+        break;
+    }
+    final where = conditions.isEmpty ? '' : 'WHERE ${conditions.join(' AND ')}';
+    final rows = await db.rawQuery('''
+      SELECT r.id, r.idol_id, r.date, r.count, r.unit_price, r.subtotal,
+             r.venue, r.created_at, r.event_id, r.is_online,
+             r.record_type, r.special_name, r.group_name, r.group_members,
+             i.name AS idol_name, i.color AS idol_color,
+             i.color_value AS idol_color_value, e.name AS event_name
+      FROM records r
+      LEFT JOIN idols i ON i.id = r.idol_id
+      LEFT JOIN events e ON e.id = r.event_id
+      $where
+      ORDER BY r.date DESC, r.created_at DESC, r.id DESC
+    ''', args);
+    return rows
+        .map(
+          (row) => SpendingRecordRow(
+            record: CheckiRecord.fromMap(row),
+            idolName: row['idol_name'] as String?,
+            idolColor: row['idol_color'] as String?,
+            idolColorValue: row['idol_color_value'] as int?,
             eventName: row['event_name'] as String?,
           ),
         )

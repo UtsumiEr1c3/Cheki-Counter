@@ -255,7 +255,7 @@ class _AddRecordDialogState extends State<AddRecordDialog> {
                 validator: (v) {
                   if (v == null || v.isEmpty) return '请填写单价';
                   final n = int.tryParse(v);
-                  if (n == null || n <= 0) return '请输入正整数';
+                  if (n == null || n < 0) return '请输入非负整数';
                   return null;
                 },
               ),

@@ -30,7 +30,7 @@ class EventChekiEntryService {
     _validateEvent(event);
     _validateIdol(idol);
     _validatePositive(count, 'count');
-    _validatePositive(unitPrice, 'unitPrice');
+    _validateNonNegative(unitPrice, 'unitPrice');
 
     return _recordRepo.insert(
       CheckiRecord(
@@ -59,7 +59,7 @@ class EventChekiEntryService {
   }) async {
     _validateEvent(event);
     _validatePositive(count, 'count');
-    _validatePositive(unitPrice, 'unitPrice');
+    _validateNonNegative(unitPrice, 'unitPrice');
 
     final trimmedName = name.trim();
     final trimmedGroup = groupName.trim();
@@ -105,7 +105,7 @@ class EventChekiEntryService {
   }) async {
     _validateEvent(event);
     _validatePositive(count, 'count');
-    _validatePositive(unitPrice, 'unitPrice');
+    _validateNonNegative(unitPrice, 'unitPrice');
     final trimmedGroup = groupName.trim();
     if (trimmedGroup.isEmpty) {
       throw ArgumentError.value(groupName, 'groupName', 'must not be empty');
@@ -155,6 +155,12 @@ class EventChekiEntryService {
   void _validatePositive(int value, String name) {
     if (value <= 0) {
       throw ArgumentError.value(value, name, 'must be positive');
+    }
+  }
+
+  void _validateNonNegative(int value, String name) {
+    if (value < 0) {
+      throw ArgumentError.value(value, name, 'must be non-negative');
     }
   }
 }

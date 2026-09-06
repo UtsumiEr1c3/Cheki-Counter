@@ -96,6 +96,11 @@ class _AddThemeChekiDialogState extends State<AddThemeChekiDialog> {
     return number == null || number <= 0 ? '请输入正整数' : null;
   }
 
+  String? _nonNegativeInt(String? value) {
+    final number = int.tryParse(value?.trim() ?? '');
+    return number == null || number < 0 ? '请输入非负整数' : null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -167,7 +172,7 @@ class _AddThemeChekiDialogState extends State<AddThemeChekiDialog> {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
-                validator: _positiveInt,
+                validator: _nonNegativeInt,
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
